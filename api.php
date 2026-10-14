@@ -84,14 +84,20 @@ function current_user(): ?array
         return null;
     }
     // Gesperrte Benutzer gelten als abgemeldet – bestehende Sessions enden damit sofort.
-    $stmt = db()->prepare('SELECT id, username, role, createdAt FROM "User" WHERE id = ? AND disabledAt IS NULL');
+    $stmt = db()->prepare('SELECT id, username, role, createdAt, mustChangePassword FROM "User" WHERE id = ? AND disabledAt IS NULL');
     $stmt->execute([$userId]);
-    return $stmt->fetch() ?: null;
+    $user = $stmt->fetch();
+    return $user ? ['mustChangePassword' => (bool) $user['mustChangePassword']] + $user : null;
 }
 
-function require_user(): array
+/** Solange ein vom Admin vergebenes Passwort nicht geändert wurde, ist nur der Passwortwechsel erlaubt. */
+function require_user(bool $allowPendingPasswordChange = false): array
 {
-    return current_user() ?? fail(401, 'UNAUTHORIZED', 'Nicht angemeldet');
+    $user = current_user() ?? fail(401, 'UNAUTHORIZED', 'Nicht angemeldet');
+    if ($user['mustChangePassword'] && !$allowPendingPasswordChange) {
+        fail(403, 'PASSWORD_CHANGE_REQUIRED', 'Bitte lege zuerst ein eigenes Passwort fest');
+    }
+    return $user;
 }
 
 function require_admin(): array
@@ -158,7 +164,17 @@ function login(): never
     assert_not_disabled($user);
 
     sign_in($user);
-    respond(['user' => ['id' => $user['id'], 'username' => $user['username'], 'role' => $user['role']]]);
+    respond(['user' => session_user_json($user)]);
+}
+
+function session_user_json(array $user): array
+{
+    return [
+        'id' => $user['id'],
+        'username' => $user['username'],
+        'role' => $user['role'],
+        'mustChangePassword' => (bool) $user['mustChangePassword'],
+    ];
 }
 
 function assert_not_disabled(array $user): void
@@ -203,18 +219,23 @@ function logout(): never
     respond(['ok' => true]);
 }
 
+/** Nach einem vom Admin vergebenen Passwort entfällt die Abfrage des aktuellen Passworts. */
 function change_password(): never
 {
-    $user = require_user();
-    $input = validate_change_password(json_body());
+    $user = require_user(true);
+    $input = validate_change_password(json_body(), !$user['mustChangePassword']);
 
     $stmt = db()->prepare('SELECT passwordHash FROM "User" WHERE id = ?');
     $stmt->execute([$user['id']]);
-    if (!verify_password($input['currentPassword'], (string) $stmt->fetchColumn())) {
+    $hash = (string) $stmt->fetchColumn();
+    if (!$user['mustChangePassword'] && !verify_password($input['currentPassword'], $hash)) {
         fail(401, 'INVALID_CREDENTIALS', 'Aktuelles Passwort ist falsch');
     }
+    if (verify_password($input['newPassword'], $hash)) {
+        validation_failed(['newPassword' => 'Das neue Passwort muss sich vom bisherigen unterscheiden']);
+    }
 
-    db()->prepare('UPDATE "User" SET passwordHash = ?, updatedAt = ? WHERE id = ?')
+    db()->prepare('UPDATE "User" SET passwordHash = ?, mustChangePassword = 0, updatedAt = ? WHERE id = ?')
         ->execute([hash_password($input['newPassword']), now(), $user['id']]);
     respond(['ok' => true]);
 }
@@ -344,7 +365,7 @@ function passkey_login(): never
         fail(429, 'RATE_LIMITED', 'Zu viele Anmeldeversuche. Bitte später erneut versuchen.');
     }
     $body = json_body();
-    $stmt = db()->prepare('SELECT p.*, u.username, u.role, u.disabledAt FROM "Passkey" p JOIN "User" u ON u.id = p.userId WHERE p.credentialId = ?');
+    $stmt = db()->prepare('SELECT p.*, u.username, u.role, u.disabledAt, u.mustChangePassword FROM "Passkey" p JOIN "User" u ON u.id = p.userId WHERE p.credentialId = ?');
     $stmt->execute([(string) ($body['id'] ?? '')]);
     $passkey = $stmt->fetch();
     if (!$passkey) {
@@ -361,23 +382,24 @@ function passkey_login(): never
     db()->prepare('UPDATE "Passkey" SET signCount = ?, lastUsedAt = ? WHERE id = ?')
         ->execute([$signCount, now(), $passkey['id']]);
 
-    $user = ['id' => $passkey['userId'], 'username' => $passkey['username'], 'role' => $passkey['role']];
+    $user = session_user_json(['id' => $passkey['userId']] + $passkey);
     sign_in($user);
     respond(['user' => $user]);
 }
 
 // ---------------------------------------------------------------- Benutzer
 
-function insert_user(string $username, string $password, string $role): array
+/** Mit `$mustChangePassword` muss der Benutzer das Passwort nach der ersten Anmeldung ändern. */
+function insert_user(string $username, string $password, string $role, bool $mustChangePassword = false): array
 {
     $exists = db()->prepare('SELECT 1 FROM "User" WHERE username = ?');
     $exists->execute([$username]);
     if ($exists->fetchColumn()) {
         fail(409, 'CONFLICT', 'Benutzername ist bereits vergeben');
     }
-    $user = ['id' => uuid(), 'username' => $username, 'role' => $role, 'createdAt' => now()];
-    db()->prepare('INSERT INTO "User" (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)')
-        ->execute([$user['id'], $username, hash_password($password), $role, $user['createdAt'], $user['createdAt']]);
+    $user = ['id' => uuid(), 'username' => $username, 'role' => $role, 'createdAt' => now(), 'mustChangePassword' => $mustChangePassword];
+    db()->prepare('INSERT INTO "User" (id, username, passwordHash, role, createdAt, updatedAt, mustChangePassword) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$user['id'], $username, hash_password($password), $role, $user['createdAt'], $user['createdAt'], (int) $mustChangePassword]);
     return $user;
 }
 
@@ -390,6 +412,7 @@ function user_json(array $row): array
         'createdAt' => $row['createdAt'],
         'disabled' => $row['disabledAt'] !== null,
         'disabledAt' => $row['disabledAt'],
+        'mustChangePassword' => (bool) $row['mustChangePassword'],
         'destinationCount' => (int) ($row['destinationCount'] ?? 0),
         'passkeyCount' => (int) ($row['passkeyCount'] ?? 0),
     ];
@@ -398,7 +421,7 @@ function user_json(array $row): array
 function user_query(string $where = ''): string
 {
     return <<<SQL
-        SELECT u.id, u.username, u.role, u.createdAt, u.disabledAt,
+        SELECT u.id, u.username, u.role, u.createdAt, u.disabledAt, u.mustChangePassword,
             (SELECT COUNT(*) FROM "Destination" d WHERE d.createdBy = u.id AND d.deletedAt IS NULL) AS destinationCount,
             (SELECT COUNT(*) FROM "Passkey" p WHERE p.userId = u.id) AS passkeyCount
         FROM "User" u $where
@@ -411,7 +434,10 @@ function list_users(): never
     respond(array_map('user_json', db()->query(user_query('ORDER BY u.username'))->fetchAll()));
 }
 
-/** Ohne Passwort im Body erzeugt der Server eines und gibt es einmalig zurück. */
+/**
+ * Ohne Passwort im Body erzeugt der Server eines und gibt es einmalig zurück.
+ * Da der Admin das Passwort kennt, muss der neue Benutzer es nach der ersten Anmeldung ändern.
+ */
 function create_user(): never
 {
     require_admin();
@@ -419,11 +445,11 @@ function create_user(): never
     $role = ($body['role'] ?? 'USER') === 'ADMIN' ? 'ADMIN' : 'USER';
     if (($body['password'] ?? '') === '') {
         $password = generate_password();
-        $user = insert_user(validate_username($body), $password, $role);
+        $user = insert_user(validate_username($body), $password, $role, true);
         respond(['password' => $password] + user_json($user + ['disabledAt' => null]), 201);
     }
     $input = validate_credentials($body);
-    respond(user_json(insert_user($input['username'], $input['password'], $role) + ['disabledAt' => null]), 201);
+    respond(user_json(insert_user($input['username'], $input['password'], $role, true) + ['disabledAt' => null]), 201);
 }
 
 /** Lädt einen anderen Benutzer – Admins können sich nicht selbst sperren, löschen oder zurücksetzen. */
@@ -454,7 +480,7 @@ function reset_user_password(string $id): never
 {
     other_user($id);
     $password = generate_password();
-    db()->prepare('UPDATE "User" SET passwordHash = ?, updatedAt = ? WHERE id = ?')->execute([hash_password($password), now(), $id]);
+    db()->prepare('UPDATE "User" SET passwordHash = ?, mustChangePassword = 1, updatedAt = ? WHERE id = ?')->execute([hash_password($password), now(), $id]);
     respond(['password' => $password]);
 }
 

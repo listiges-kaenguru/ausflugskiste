@@ -28,8 +28,9 @@ das Frontend ist reines HTML/CSS/JavaScript, das Backend reines PHP mit SQLite.
 3. Die Seite im Browser öffnen. Beim ersten Aufruf wird die Datenbank angelegt und
    du richtest den ersten Zugang ein – er erhält Administratorrechte.
 4. Weitere Benutzer legt ein Admin unter **Profil → Benutzer** an. Das Passwort erzeugt die App und zeigt es
-   einmalig zum Weitergeben an. Dort lassen sich Benutzer auch sperren, entsperren, löschen und ihr Passwort
-   neu erzeugen.
+   einmalig zum Weitergeben an. Bei der ersten Anmeldung muss der Benutzer ein eigenes Passwort festlegen.
+   Dort lassen sich Benutzer auch sperren, entsperren, löschen und ihr Passwort neu erzeugen (auch danach ist
+   ein Passwortwechsel fällig).
 
 Für den Betrieb im Internet unbedingt HTTPS verwenden.
 

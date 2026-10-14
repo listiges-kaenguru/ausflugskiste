@@ -79,12 +79,12 @@ function validate_credentials(array $body): array
     return ['username' => $username, 'password' => $password];
 }
 
-function validate_change_password(array $body): array
+function validate_change_password(array $body, bool $requireCurrent = true): array
 {
     $errors = [];
     $current = string_field($body, 'currentPassword') ?? '';
     $new = string_field($body, 'newPassword') ?? '';
-    if (strlen($current) < 6) {
+    if ($requireCurrent && strlen($current) < 6) {
         $errors['currentPassword'] = 'Aktuelles Passwort fehlt';
     }
     if (strlen($new) < 6) {

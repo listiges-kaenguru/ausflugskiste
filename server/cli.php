@@ -48,8 +48,8 @@ switch ($command) {
         break;
 
     case 'list-users':
-        foreach (db()->query('SELECT username, role, createdAt, disabledAt FROM "User" ORDER BY username') as $user) {
-            $status = $user['disabledAt'] === null ? '' : "\tgesperrt";
+        foreach (db()->query('SELECT username, role, createdAt, disabledAt, mustChangePassword FROM "User" ORDER BY username') as $user) {
+            $status = ($user['disabledAt'] === null ? '' : "\tgesperrt") . ($user['mustChangePassword'] ? "\tPasswortwechsel ausstehend" : '');
             echo "{$user['username']}\t{$user['role']}\t{$user['createdAt']}$status\n";
         }
         break;

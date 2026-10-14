@@ -105,6 +105,11 @@ async function api(route, { method = "GET", body, query } = {}) {
       session.user = null;
       setTimeout(render);
     }
+    // Der Admin hat ein neues Passwort vergeben, während die Sitzung lief.
+    if (result?.error?.code === "PASSWORD_CHANGE_REQUIRED" && session.user && !session.user.mustChangePassword) {
+      session.user.mustChangePassword = true;
+      setTimeout(render);
+    }
     throw new ApiError(response.status, result?.error?.message ?? "Unbekannter Fehler", result?.error?.code);
   }
   return result.data;
@@ -310,7 +315,7 @@ function passwordDialog({ title, username, password }) {
   }, icon("copy", "sm"), "Kopieren");
   return dialog({
     title,
-    text: `Gib ${username} dieses Passwort weiter. Es wird nur jetzt angezeigt; ändern lässt es sich nach der Anmeldung unter Profil.`,
+    text: `Gib ${username} dieses Passwort weiter. Es wird nur jetzt angezeigt; bei der nächsten Anmeldung muss ${username} ein eigenes Passwort festlegen.`,
     content: h("div", { class: "password-row" }, input, copyButton),
     confirmLabel: "Fertig",
     cancelLabel: null,
@@ -1321,6 +1326,7 @@ function usersCard(users) {
       `Seit ${formatDate(entry.createdAt)}`,
       plural(entry.destinationCount, "Ziel", "Ziele"),
       entry.passkeyCount ? plural(entry.passkeyCount, "Passkey", "Passkeys") : null,
+      entry.mustChangePassword ? "Passwort noch nicht geändert" : null,
       entry.disabled ? `gesperrt seit ${formatDate(entry.disabledAt)}` : null,
     ].filter(Boolean).join(" · ");
   }
@@ -1369,7 +1375,10 @@ function usersCard(users) {
       confirmLabel: "Passwort erzeugen",
       onConfirm: () => api(`users/${entry.id}/password`, { method: "POST" }),
     });
-    if (result) await passwordDialog({ title: `Neues Passwort für ${entry.username}`, username: entry.username, password: result.password });
+    if (!result) return;
+    entry.mustChangePassword = true;
+    renderList();
+    await passwordDialog({ title: `Neues Passwort für ${entry.username}`, username: entry.username, password: result.password });
   }
 
   // Passkeys eines Benutzers ansehen und einzeln entfernen, z. B. nach einem verlorenen Gerät.
@@ -1701,6 +1710,42 @@ function authPage({ setup }) {
   );
 }
 
+/** Nach einem vom Admin vergebenen Passwort: eigenes Passwort festlegen, bevor es weitergeht. */
+function changePasswordPage() {
+  setTitle("Neues Passwort");
+  const form = h(
+    "form",
+    null,
+    // Für Passwortmanager, damit sie das neue Passwort dem richtigen Benutzer zuordnen.
+    h("input", { type: "text", name: "username", value: session.user.username, autocomplete: "username", hidden: true, readonly: true }),
+    field("Neues Passwort", h("input", { type: "password", name: "newPassword", autocomplete: "new-password", minlength: "6", required: true, autofocus: true }), { hint: "Mindestens 6 Zeichen." }),
+    field("Wiederholen", h("input", { type: "password", name: "repeatPassword", autocomplete: "new-password", minlength: "6", required: true })),
+    h("button", { type: "submit", class: "btn block" }, "Passwort speichern"),
+  );
+  bindForm(form, async (data) => {
+    if (data.get("newPassword") !== data.get("repeatPassword")) throw new Error("Die Passwörter stimmen nicht überein");
+    await api("change-password", { method: "POST", body: { newPassword: data.get("newPassword") } });
+    session.user.mustChangePassword = false;
+    toast("Passwort gespeichert");
+    go("/");
+  });
+
+  return h(
+    "div",
+    { class: "auth" },
+    h(
+      "div",
+      { class: "auth-head" },
+      h("img", { src: "icon.svg", alt: "" }),
+      h("h1", null, "Eigenes Passwort festlegen"),
+      h("p", { class: "muted" }, `Hallo ${session.user.username}, dein Passwort wurde von einem Administrator vergeben. Lege bitte ein eigenes fest, das nur du kennst.`),
+    ),
+    h("div", { class: "card" }, form),
+    h("button", { type: "button", class: "btn ghost auth-logout", onclick: logout }, icon("logout", "sm"), "Abmelden"),
+    appFooter(),
+  );
+}
+
 // ---------------------------------------------------------------- Router
 
 const session = { user: null, needsSetup: false, passkeys: false, version: null, sourceUrl: null, loaded: false };
@@ -1749,6 +1794,9 @@ async function render() {
   } else if (!session.user) {
     view = () => authPage({ setup: false });
     layout = "centered";
+  } else if (session.user.mustChangePassword) {
+    view = changePasswordPage;
+    layout = "centered";
   } else if (path === "/login") {
     go("/");
     return;
@@ -1765,7 +1813,7 @@ async function render() {
     }
   }
 
-  topbar.hidden = !session.user;
+  topbar.hidden = !session.user || session.user.mustChangePassword;
   for (const link of topbar.querySelectorAll("nav a")) {
     link.classList.toggle("active", link.dataset.route === active);
     if (link.dataset.route === active) link.setAttribute("aria-current", "page");

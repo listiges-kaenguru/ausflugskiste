@@ -154,6 +154,9 @@ function migrate(PDO $pdo): void
     if (!in_array('disabledAt', $userColumns, true)) {
         $pdo->exec('ALTER TABLE "User" ADD COLUMN "disabledAt" DATETIME');
     }
+    if (!in_array('mustChangePassword', $userColumns, true)) {
+        $pdo->exec('ALTER TABLE "User" ADD COLUMN "mustChangePassword" BOOLEAN NOT NULL DEFAULT false');
+    }
 }
 
 function uuid(): string

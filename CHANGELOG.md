@@ -13,6 +13,12 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
   Benutzers; einzelne lassen sich entfernen, z. B. nach einem verlorenen Gerät. Neue Endpunkte
   `GET users/<id>/passkeys` und `DELETE users/<id>/passkeys/<passkeyId>`, neue CLI-Befehle
   `list-passkeys <name>` und `delete-passkeys <name> [<passkey-id>]`.
+- **Passwortwechsel erzwingen:** Nach einem vom Admin vergebenen Passwort (neuer Benutzer oder „Neues Passwort“)
+  muss der Benutzer bei der nächsten Anmeldung – auch per Passkey – ein eigenes Passwort festlegen; bis dahin
+  lehnt die API alle anderen Anfragen mit `PASSWORD_CHANGE_REQUIRED` ab. Das aktuelle Passwort wird dabei nicht
+  abgefragt, das neue muss sich vom bisherigen unterscheiden. Die Benutzerliste und `server/cli.php list-users`
+  zeigen ausstehende Wechsel. Neue Spalte `User.mustChangePassword` (wird automatisch ergänzt); `me`, `login`,
+  `passkey-login` und `users` liefern das Feld `mustChangePassword`.
 
 ### Geändert
 - **Lizenz:** Die App steht jetzt unter der GNU Affero General Public License v3.0 oder später (bisher GPL-3.0).
