@@ -118,6 +118,7 @@ function me(): never
         'needsSetup' => needs_setup(),
         'passkeys' => passkeys_available(),
         'version' => APP_VERSION,
+        'sourceUrl' => SOURCE_URL,
     ]);
 }
 

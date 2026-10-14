@@ -160,11 +160,15 @@ Hinweise zur Entwicklung und zu Beiträgen stehen in [CONTRIBUTING.md](CONTRIBUT
 Copyright (C) 2026 listiges-kaenguru
 
 Dieses Programm ist freie Software: Sie können es unter den Bedingungen der
-GNU General Public License, wie von der Free Software Foundation veröffentlicht,
+GNU Affero General Public License, wie von der Free Software Foundation veröffentlicht,
 weitergeben und/oder modifizieren, entweder gemäß Version 3 der Lizenz oder
 (nach Ihrer Wahl) jeder späteren Version.
 
 Dieses Programm wird in der Hoffnung bereitgestellt, dass es nützlich ist,
 jedoch OHNE JEDE GEWÄHRLEISTUNG. Details finden Sie in der Datei [LICENSE](LICENSE).
+
+Die App verlinkt auf der Anmeldeseite und im Profil auf ihren Quelltext. Wer eine veränderte Fassung
+für andere über das Netzwerk bereitstellt, muss deren Quelltext ebenfalls anbieten (Abschnitt 13 der AGPL)
+und dazu `SOURCE_URL` in `server/bootstrap.php` anpassen.
 
 Icons: [Lucide](https://lucide.dev) (ISC-Lizenz).

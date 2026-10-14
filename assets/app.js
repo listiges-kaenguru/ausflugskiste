@@ -1539,8 +1539,19 @@ async function profilePage() {
     ),
     tagSection,
     userSection,
-    session.version ? h("p", { class: "footer-note" }, `Ausflugsziele ${session.version}`) : null,
+    appFooter(),
   ];
+}
+
+// Version und Link zum Quelltext (von der AGPL für Nutzer über das Netzwerk verlangt).
+function appFooter() {
+  return h(
+    "p",
+    { class: "footer-note" },
+    session.version ? `Ausflugsziele ${session.version} · ` : "Ausflugsziele · ",
+    h("a", { href: session.sourceUrl, target: "_blank", rel: "noopener" }, "Quelltext"),
+    " · Lizenz: AGPL-3.0",
+  );
 }
 
 async function logout() {
@@ -1630,12 +1641,13 @@ function authPage({ setup }) {
       form,
     ),
     setup ? h("p", { class: "muted small" }, "Nach der Einrichtung kannst du zusätzlich einen Passkey anlegen.") : null,
+    appFooter(),
   );
 }
 
 // ---------------------------------------------------------------- Router
 
-const session = { user: null, needsSetup: false, passkeys: false, version: null, loaded: false };
+const session = { user: null, needsSetup: false, passkeys: false, version: null, sourceUrl: null, loaded: false };
 
 const routes = [
   [/^\/$/, "dashboard", () => dashboardPage()],

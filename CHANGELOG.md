@@ -6,6 +6,13 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzeit ändern.
 
+## [Unveröffentlicht]
+
+### Geändert
+- **Lizenz:** Die App steht jetzt unter der GNU Affero General Public License v3.0 oder später (bisher GPL-3.0).
+- Anmeldeseite und Profil verlinken auf den Quelltext (`SOURCE_URL` in `server/bootstrap.php`);
+  `me` liefert zusätzlich `sourceUrl`.
+
 ## [0.1.0] – 2026-10-08
 
 ### Hinzugefügt
@@ -124,6 +131,7 @@ Erste versionierte Veröffentlichung. Die App läuft jetzt ohne npm, Framework u
 Ursprüngliche, nicht versionierte Fassung als Next.js-PWA mit Prisma, Login, Ausflugszielen, Tags und
 Bild-Upload-API (Commit [`96d0982`](https://github.com/listiges-kaenguru/ausflugsziele/commit/96d0982)).
 
+[Unveröffentlicht]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.1...v0.0.2

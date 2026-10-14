@@ -122,4 +122,4 @@ Sicherheitsprobleme bitte **nicht** als öffentliches Issue melden, sondern vert
 ## Lizenz
 
 Mit deinem Beitrag erklärst du dich einverstanden, dass er unter der
-[GNU General Public License v3.0 oder später](LICENSE) veröffentlicht wird.
+[GNU Affero General Public License v3.0 oder später](LICENSE) veröffentlicht wird.
