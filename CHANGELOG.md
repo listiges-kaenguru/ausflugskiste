@@ -6,6 +6,28 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzeit ändern.
 
+## [0.2.0] – 2026-10-14
+
+### Hinzugefügt
+- **Passkeys verwalten für Admins:** Unter Profil → Benutzer zeigt ein Fingerabdruck-Button die Passkeys eines
+  Benutzers; einzelne lassen sich entfernen, z. B. nach einem verlorenen Gerät. Neue Endpunkte
+  `GET users/<id>/passkeys` und `DELETE users/<id>/passkeys/<passkeyId>`, neue CLI-Befehle
+  `list-passkeys <name>` und `delete-passkeys <name> [<passkey-id>]`.
+- **Passwortwechsel erzwingen:** Nach einem vom Admin vergebenen Passwort (neuer Benutzer oder „Neues Passwort“)
+  muss der Benutzer bei der nächsten Anmeldung – auch per Passkey – ein eigenes Passwort festlegen; bis dahin
+  lehnt die API alle anderen Anfragen mit `PASSWORD_CHANGE_REQUIRED` ab. Das aktuelle Passwort wird dabei nicht
+  abgefragt, das neue muss sich vom bisherigen unterscheiden. Die Benutzerliste und `server/cli.php list-users`
+  zeigen ausstehende Wechsel. Neue Spalte `User.mustChangePassword` (wird automatisch ergänzt); `me`, `login`,
+  `passkey-login` und `users` liefern das Feld `mustChangePassword`.
+- **Bilder verkleinern:** Fotos werden vor dem Upload im Browser per Canvas auf höchstens 2560 Pixel
+  Kantenlänge verkleinert (JPEG mit Qualität 0,85, PNG bleibt PNG, GIFs bleiben unverändert). Das spart Speicher
+  und Ladezeit; größere Handyfotos passen so unter die Upload-Grenze. Bereits gespeicherte Fotos bleiben unverändert.
+
+### Geändert
+- **Lizenz:** Die App steht jetzt unter der GNU Affero General Public License v3.0 oder später (bisher GPL-3.0).
+- Anmeldeseite und Profil verlinken auf den Quelltext (`SOURCE_URL` in `server/bootstrap.php`);
+  `me` liefert zusätzlich `sourceUrl`.
+
 ## [0.1.0] – 2026-10-08
 
 ### Hinzugefügt
@@ -124,6 +146,7 @@ Erste versionierte Veröffentlichung. Die App läuft jetzt ohne npm, Framework u
 Ursprüngliche, nicht versionierte Fassung als Next.js-PWA mit Prisma, Login, Ausflugszielen, Tags und
 Bild-Upload-API (Commit [`96d0982`](https://github.com/listiges-kaenguru/ausflugsziele/commit/96d0982)).
 
+[0.2.0]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.1...v0.0.2

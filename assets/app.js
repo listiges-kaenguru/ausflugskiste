@@ -44,6 +44,7 @@ const ICONS = {
   camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
   imagePlus: '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
   key: '<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+  fingerprint: '<path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/>',
   shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   unlock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
@@ -102,6 +103,11 @@ async function api(route, { method = "GET", body, query } = {}) {
     // Session abgelaufen: zur Anmeldung wechseln (fehlgeschlagene Logins ausgenommen).
     if (response.status === 401 && session.user && !["login", "passkey-login", "change-password"].includes(route)) {
       session.user = null;
+      setTimeout(render);
+    }
+    // Der Admin hat ein neues Passwort vergeben, während die Sitzung lief.
+    if (result?.error?.code === "PASSWORD_CHANGE_REQUIRED" && session.user && !session.user.mustChangePassword) {
+      session.user.mustChangePassword = true;
       setTimeout(render);
     }
     throw new ApiError(response.status, result?.error?.message ?? "Unbekannter Fehler", result?.error?.code);
@@ -309,7 +315,7 @@ function passwordDialog({ title, username, password }) {
   }, icon("copy", "sm"), "Kopieren");
   return dialog({
     title,
-    text: `Gib ${username} dieses Passwort weiter. Es wird nur jetzt angezeigt; ändern lässt es sich nach der Anmeldung unter Profil.`,
+    text: `Gib ${username} dieses Passwort weiter. Es wird nur jetzt angezeigt; bei der nächsten Anmeldung muss ${username} ein eigenes Passwort festlegen.`,
     content: h("div", { class: "password-row" }, input, copyButton),
     confirmLabel: "Fertig",
     cancelLabel: null,
@@ -623,6 +629,48 @@ const SORTS = {
   rating: ["Beste Bewertung", (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.name.localeCompare(b.name, "de")],
 };
 
+// ---------------------------------------------------------------- Bilder verkleinern
+
+const MAX_IMAGE_SIDE = 2560;
+const SHRINK_ABOVE_BYTES = 1.5 * 1024 * 1024;
+const JPEG_QUALITY = 0.85;
+
+/**
+ * Verkleinert große Fotos vor dem Upload per Canvas (längste Seite höchstens MAX_IMAGE_SIDE).
+ * PNG bleibt PNG (Transparenz), alles andere wird JPEG; GIFs bleiben unverändert (Animation).
+ * Klappt etwas nicht oder wird die Datei nicht kleiner, wird das Original hochgeladen.
+ */
+async function shrinkImage(file) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || !window.createImageBitmap) return file;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size <= SHRINK_ABOVE_BYTES) {
+      bitmap.close();
+      return file;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const context = canvas.getContext("2d");
+    const type = file.type === "image/png" ? "image/png" : "image/jpeg";
+    if (type === "image/jpeg") {
+      // JPEG kennt keine Transparenz – sonst würden transparente WebP-Bereiche schwarz.
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, JPEG_QUALITY));
+    if (!blob || blob.size >= file.size) return file;
+    const name = type === file.type ? file.name : file.name.replace(/\.\w+$/, "") + ".jpg";
+    return new File([blob], name, { type, lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
+}
+
 async function dashboardPage({ focusSearch = false } = {}) {
   setTitle("Ziele");
   const wantsHint = supportsPasskeys() && !stored(`passkeyHintDismissed:${session.user.id}`);
@@ -928,7 +976,7 @@ async function detailPage(id) {
       uploadLabel.textContent = `Lade ${number + 1} von ${images.length} …`;
       const body = new FormData();
       body.append("destinationId", destination.id);
-      body.append("file", file);
+      body.append("file", await shrinkImage(file));
       try {
         destination.images.push(await api("images", { method: "POST", body }));
         uploaded++;
@@ -1310,7 +1358,7 @@ function passkeySection(passkeys) {
   );
 }
 
-/** Benutzerverwaltung für Admins: anlegen (mit erzeugtem Passwort), Passwort zurücksetzen, sperren, löschen. */
+/** Benutzerverwaltung für Admins: anlegen (mit erzeugtem Passwort), Passwort zurücksetzen, Passkeys entfernen, sperren, löschen. */
 function usersCard(users) {
   const list = h("ul", { class: "list" });
   const count = h("p", { class: "muted small" });
@@ -1320,6 +1368,7 @@ function usersCard(users) {
       `Seit ${formatDate(entry.createdAt)}`,
       plural(entry.destinationCount, "Ziel", "Ziele"),
       entry.passkeyCount ? plural(entry.passkeyCount, "Passkey", "Passkeys") : null,
+      entry.mustChangePassword ? "Passwort noch nicht geändert" : null,
       entry.disabled ? `gesperrt seit ${formatDate(entry.disabledAt)}` : null,
     ].filter(Boolean).join(" · ");
   }
@@ -1352,6 +1401,7 @@ function usersCard(users) {
                 "span",
                 { class: "row user-actions" },
                 iconButton("key", `Neues Passwort für ${entry.username}`, () => resetPassword(entry)),
+                iconButton("fingerprint", `Passkeys von ${entry.username}`, () => managePasskeys(entry)),
                 iconButton(entry.disabled ? "unlock" : "lock", `${entry.username} ${entry.disabled ? "entsperren" : "sperren"}`, () => toggleLock(entry)),
                 iconButton("trash", `${entry.username} löschen`, () => remove(entry), "danger"),
               ),
@@ -1367,7 +1417,64 @@ function usersCard(users) {
       confirmLabel: "Passwort erzeugen",
       onConfirm: () => api(`users/${entry.id}/password`, { method: "POST" }),
     });
-    if (result) await passwordDialog({ title: `Neues Passwort für ${entry.username}`, username: entry.username, password: result.password });
+    if (!result) return;
+    entry.mustChangePassword = true;
+    renderList();
+    await passwordDialog({ title: `Neues Passwort für ${entry.username}`, username: entry.username, password: result.password });
+  }
+
+  // Passkeys eines Benutzers ansehen und einzeln entfernen, z. B. nach einem verlorenen Gerät.
+  async function managePasskeys(entry) {
+    let passkeys;
+    try {
+      passkeys = await api(`users/${entry.id}/passkeys`);
+    } catch (error) {
+      toast(error.message, "error");
+      return;
+    }
+    const list = h("ul", { class: "list" });
+    const empty = h("p", { class: "muted" }, `${entry.username} hat keine Passkeys.`);
+
+    function renderPasskeys() {
+      list.replaceChildren(
+        ...passkeys.map((passkey) =>
+          h(
+            "li",
+            null,
+            h("span", { class: "list-icon" }, icon("key", "sm")),
+            h(
+              "div",
+              { class: "grow" },
+              h("span", null, passkey.name),
+              h("span", { class: "muted small" }, `Angelegt am ${formatDate(passkey.createdAt)}`, passkey.lastUsedAt ? ` · zuletzt genutzt am ${formatDate(passkey.lastUsedAt)}` : " · noch nicht genutzt"),
+            ),
+            iconButton("trash", `${passkey.name} entfernen`, async () => {
+              const confirmed = await confirmDialog(
+                "Passkey entfernen?",
+                `${entry.username} kann sich mit „${passkey.name}“ danach nicht mehr anmelden. Das Passwort und andere Passkeys bleiben gültig.`,
+                "Entfernen",
+              );
+              if (!confirmed) return;
+              try {
+                await api(`users/${entry.id}/passkeys/${passkey.id}`, { method: "DELETE" });
+                passkeys.splice(passkeys.indexOf(passkey), 1);
+                entry.passkeyCount = passkeys.length;
+                renderPasskeys();
+                renderList();
+                toast("Passkey entfernt");
+              } catch (error) {
+                toast(error.message, "error");
+              }
+            }, "danger"),
+          ),
+        ),
+      );
+      list.hidden = passkeys.length === 0;
+      empty.hidden = passkeys.length > 0;
+    }
+
+    renderPasskeys();
+    await dialog({ title: `Passkeys von ${entry.username}`, content: [list, empty], confirmLabel: "Schließen", cancelLabel: null });
   }
 
   async function toggleLock(entry) {
@@ -1539,8 +1646,19 @@ async function profilePage() {
     ),
     tagSection,
     userSection,
-    session.version ? h("p", { class: "footer-note" }, `Ausflugsziele ${session.version}`) : null,
+    appFooter(),
   ];
+}
+
+// Version und Link zum Quelltext (von der AGPL für Nutzer über das Netzwerk verlangt).
+function appFooter() {
+  return h(
+    "p",
+    { class: "footer-note" },
+    session.version ? `Ausflugsziele ${session.version} · ` : "Ausflugsziele · ",
+    h("a", { href: session.sourceUrl, target: "_blank", rel: "noopener" }, "Quelltext"),
+    " · Lizenz: AGPL-3.0",
+  );
 }
 
 async function logout() {
@@ -1630,12 +1748,49 @@ function authPage({ setup }) {
       form,
     ),
     setup ? h("p", { class: "muted small" }, "Nach der Einrichtung kannst du zusätzlich einen Passkey anlegen.") : null,
+    appFooter(),
+  );
+}
+
+/** Nach einem vom Admin vergebenen Passwort: eigenes Passwort festlegen, bevor es weitergeht. */
+function changePasswordPage() {
+  setTitle("Neues Passwort");
+  const form = h(
+    "form",
+    null,
+    // Für Passwortmanager, damit sie das neue Passwort dem richtigen Benutzer zuordnen.
+    h("input", { type: "text", name: "username", value: session.user.username, autocomplete: "username", hidden: true, readonly: true }),
+    field("Neues Passwort", h("input", { type: "password", name: "newPassword", autocomplete: "new-password", minlength: "6", required: true, autofocus: true }), { hint: "Mindestens 6 Zeichen." }),
+    field("Wiederholen", h("input", { type: "password", name: "repeatPassword", autocomplete: "new-password", minlength: "6", required: true })),
+    h("button", { type: "submit", class: "btn block" }, "Passwort speichern"),
+  );
+  bindForm(form, async (data) => {
+    if (data.get("newPassword") !== data.get("repeatPassword")) throw new Error("Die Passwörter stimmen nicht überein");
+    await api("change-password", { method: "POST", body: { newPassword: data.get("newPassword") } });
+    session.user.mustChangePassword = false;
+    toast("Passwort gespeichert");
+    go("/");
+  });
+
+  return h(
+    "div",
+    { class: "auth" },
+    h(
+      "div",
+      { class: "auth-head" },
+      h("img", { src: "icon.svg", alt: "" }),
+      h("h1", null, "Eigenes Passwort festlegen"),
+      h("p", { class: "muted" }, `Hallo ${session.user.username}, dein Passwort wurde von einem Administrator vergeben. Lege bitte ein eigenes fest, das nur du kennst.`),
+    ),
+    h("div", { class: "card" }, form),
+    h("button", { type: "button", class: "btn ghost auth-logout", onclick: logout }, icon("logout", "sm"), "Abmelden"),
+    appFooter(),
   );
 }
 
 // ---------------------------------------------------------------- Router
 
-const session = { user: null, needsSetup: false, passkeys: false, version: null, loaded: false };
+const session = { user: null, needsSetup: false, passkeys: false, version: null, sourceUrl: null, loaded: false };
 
 const routes = [
   [/^\/$/, "dashboard", () => dashboardPage()],
@@ -1681,6 +1836,9 @@ async function render() {
   } else if (!session.user) {
     view = () => authPage({ setup: false });
     layout = "centered";
+  } else if (session.user.mustChangePassword) {
+    view = changePasswordPage;
+    layout = "centered";
   } else if (path === "/login") {
     go("/");
     return;
@@ -1697,7 +1855,7 @@ async function render() {
     }
   }
 
-  topbar.hidden = !session.user;
+  topbar.hidden = !session.user || session.user.mustChangePassword;
   for (const link of topbar.querySelectorAll("nav a")) {
     link.classList.toggle("active", link.dataset.route === active);
     if (link.dataset.route === active) link.setAttribute("aria-current", "page");

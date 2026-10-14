@@ -3,6 +3,8 @@
 //   php server/cli.php create-user <benutzername> <passwort> [ADMIN|USER]
 //   php server/cli.php set-password <benutzername> <passwort>
 //   php server/cli.php list-users
+//   php server/cli.php list-passkeys <benutzername>
+//   php server/cli.php delete-passkeys <benutzername> [<passkey-id>]   (ohne ID: alle)
 //   php server/cli.php seed-demo        (nur für die lokale Entwicklung, gibt zufällige Passwörter aus)
 
 declare(strict_types=1);
@@ -46,10 +48,33 @@ switch ($command) {
         break;
 
     case 'list-users':
-        foreach (db()->query('SELECT username, role, createdAt, disabledAt FROM "User" ORDER BY username') as $user) {
-            $status = $user['disabledAt'] === null ? '' : "\tgesperrt";
+        foreach (db()->query('SELECT username, role, createdAt, disabledAt, mustChangePassword FROM "User" ORDER BY username') as $user) {
+            $status = ($user['disabledAt'] === null ? '' : "\tgesperrt") . ($user['mustChangePassword'] ? "\tPasswortwechsel ausstehend" : '');
             echo "{$user['username']}\t{$user['role']}\t{$user['createdAt']}$status\n";
         }
+        break;
+
+    case 'list-passkeys':
+        $userId = cli_user_id($argv[2] ?? '');
+        $stmt = db()->prepare('SELECT id, name, createdAt, lastUsedAt FROM "Passkey" WHERE userId = ? ORDER BY createdAt');
+        $stmt->execute([$userId]);
+        $passkeys = $stmt->fetchAll();
+        foreach ($passkeys as $passkey) {
+            echo "{$passkey['id']}\t{$passkey['name']}\t{$passkey['createdAt']}\t" . ($passkey['lastUsedAt'] ?? 'nie genutzt') . "\n";
+        }
+        if (!$passkeys) {
+            echo "Keine Passkeys.\n";
+        }
+        break;
+
+    case 'delete-passkeys':
+        $userId = cli_user_id($argv[2] ?? '');
+        $passkeyId = $argv[3] ?? null;
+        $stmt = $passkeyId === null
+            ? db()->prepare('DELETE FROM "Passkey" WHERE userId = ?')
+            : db()->prepare('DELETE FROM "Passkey" WHERE userId = ? AND id = ?');
+        $stmt->execute($passkeyId === null ? [$userId] : [$userId, $passkeyId]);
+        echo $stmt->rowCount() === 1 ? "1 Passkey entfernt.\n" : "{$stmt->rowCount()} Passkeys entfernt.\n";
         break;
 
     case 'seed-demo':
@@ -58,8 +83,20 @@ switch ($command) {
         break;
 
     default:
-        echo "Befehle: create-user, set-password, list-users, seed-demo\n";
+        echo "Befehle: create-user, set-password, list-users, list-passkeys, delete-passkeys, seed-demo\n";
         exit(1);
+}
+
+function cli_user_id(string $username): string
+{
+    $stmt = db()->prepare('SELECT id FROM "User" WHERE username = ?');
+    $stmt->execute([$username]);
+    $id = $stmt->fetchColumn();
+    if ($id === false) {
+        fwrite(STDERR, "Benutzer $username nicht gefunden.\n");
+        exit(1);
+    }
+    return $id;
 }
 
 function seed_demo(): void

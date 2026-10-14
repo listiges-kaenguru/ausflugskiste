@@ -4,7 +4,10 @@
 
 declare(strict_types=1);
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.2.0';
+// Link zum Quelltext, den die App allen Nutzern anzeigt (AGPL-3.0, Abschnitt 13).
+// Wer eine veränderte Fassung betreibt, muss hier auf deren Quelltext verweisen.
+const SOURCE_URL = 'https://github.com/listiges-kaenguru/ausflugsziele';
 const SESSION_LIFETIME = 60 * 60 * 24 * 7;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = [
@@ -150,6 +153,9 @@ function migrate(PDO $pdo): void
     $userColumns = array_column($pdo->query('PRAGMA table_info("User")')->fetchAll(), 'name');
     if (!in_array('disabledAt', $userColumns, true)) {
         $pdo->exec('ALTER TABLE "User" ADD COLUMN "disabledAt" DATETIME');
+    }
+    if (!in_array('mustChangePassword', $userColumns, true)) {
+        $pdo->exec('ALTER TABLE "User" ADD COLUMN "mustChangePassword" BOOLEAN NOT NULL DEFAULT false');
     }
 }
 

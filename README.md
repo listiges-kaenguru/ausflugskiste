@@ -6,7 +6,7 @@ Progressive Web App zur Verwaltung persönlicher Ausflugsziele.
 > **Dieses Projekt befindet sich noch in der Entwicklung.**
 > Funktionen, Datenmodell und API können sich jederzeit ohne Vorankündigung ändern.
 
-Aktuelle Version: **0.1.0** – siehe [CHANGELOG](CHANGELOG.md).
+Aktuelle Version: **0.2.0** – siehe [CHANGELOG](CHANGELOG.md).
 
 Die App kommt ohne npm, Composer, Build-Schritt und externe Bibliotheken aus:
 das Frontend ist reines HTML/CSS/JavaScript, das Backend reines PHP mit SQLite.
@@ -28,8 +28,9 @@ das Frontend ist reines HTML/CSS/JavaScript, das Backend reines PHP mit SQLite.
 3. Die Seite im Browser öffnen. Beim ersten Aufruf wird die Datenbank angelegt und
    du richtest den ersten Zugang ein – er erhält Administratorrechte.
 4. Weitere Benutzer legt ein Admin unter **Profil → Benutzer** an. Das Passwort erzeugt die App und zeigt es
-   einmalig zum Weitergeben an. Dort lassen sich Benutzer auch sperren, entsperren, löschen und ihr Passwort
-   neu erzeugen.
+   einmalig zum Weitergeben an. Bei der ersten Anmeldung muss der Benutzer ein eigenes Passwort festlegen.
+   Dort lassen sich Benutzer auch sperren, entsperren, löschen und ihr Passwort neu erzeugen (auch danach ist
+   ein Passwortwechsel fällig).
 
 Für den Betrieb im Internet unbedingt HTTPS verwenden.
 
@@ -43,12 +44,17 @@ Alternative erhalten. Voraussetzungen:
   Domain um, müssen sie neu angelegt werden; die Anmeldung per Passwort funktioniert weiterhin.
 - Ohne die PHP-Erweiterung `openssl` blendet die App Passkeys aus.
 
+Geht ein Gerät verloren, kann ein Admin unter **Profil → Benutzer** die Passkeys eines Benutzers einsehen und
+einzeln entfernen – oder auf der Kommandozeile mit `list-passkeys` und `delete-passkeys` (siehe unten).
+
 ### Apache
 Die mitgelieferten `.htaccess`-Dateien sperren `server/` und `data/` und setzen Sicherheits-Header.
 Dafür muss `AllowOverride All` (mindestens `AuthConfig FileInfo Indexes Options`) erlaubt sein.
 
 PHP-Einstellungen (Fehlerausgabe aus, Uploads bis 10 MB) stehen in `.user.ini` (PHP-FPM/CGI)
 bzw. in `.htaccess` (mod_php). Lässt der Hoster das nicht zu, die Werte in dessen Verwaltungsoberfläche setzen.
+Große Fotos verkleinert die App schon im Browser vor dem Hochladen (längste Seite höchstens 2560 Pixel),
+sodass auch Handyfotos über 10 MB meist problemlos hochgeladen werden können.
 
 ### Fehlersuche
 **„Die App konnte nicht geladen werden: Auf dem Server fehlt die PHP-Erweiterung pdo_sqlite“**
@@ -105,6 +111,8 @@ php server/cli.php seed-demo
 php server/cli.php list-users
 php server/cli.php create-user <name> <passwort> [ADMIN|USER]
 php server/cli.php set-password <name> <passwort>
+php server/cli.php list-passkeys <name>
+php server/cli.php delete-passkeys <name> [<passkey-id>]   # ohne ID: alle Passkeys des Benutzers
 ```
 
 ## Backup & Restore
@@ -160,11 +168,15 @@ Hinweise zur Entwicklung und zu Beiträgen stehen in [CONTRIBUTING.md](CONTRIBUT
 Copyright (C) 2026 listiges-kaenguru
 
 Dieses Programm ist freie Software: Sie können es unter den Bedingungen der
-GNU General Public License, wie von der Free Software Foundation veröffentlicht,
+GNU Affero General Public License, wie von der Free Software Foundation veröffentlicht,
 weitergeben und/oder modifizieren, entweder gemäß Version 3 der Lizenz oder
 (nach Ihrer Wahl) jeder späteren Version.
 
 Dieses Programm wird in der Hoffnung bereitgestellt, dass es nützlich ist,
 jedoch OHNE JEDE GEWÄHRLEISTUNG. Details finden Sie in der Datei [LICENSE](LICENSE).
+
+Die App verlinkt auf der Anmeldeseite und im Profil auf ihren Quelltext. Wer eine veränderte Fassung
+für andere über das Netzwerk bereitstellt, muss deren Quelltext ebenfalls anbieten (Abschnitt 13 der AGPL)
+und dazu `SOURCE_URL` in `server/bootstrap.php` anpassen.
 
 Icons: [Lucide](https://lucide.dev) (ISC-Lizenz).
