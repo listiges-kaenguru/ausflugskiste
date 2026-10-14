@@ -28,6 +28,5 @@ Ziele (einzeln oder eine ganze Kategorie) mit anderen Benutzern teilen.
 - **Bilder verkleinern**: beim Upload serverseitig (GD, falls verfügbar) oder clientseitig per Canvas skalieren, um Speicher und Ladezeit zu sparen.
 - **Paginierung**: Die Zielliste lädt derzeit alles auf einmal und filtert im Browser – bei sehr vielen Zielen seitenweise laden und wieder serverseitig filtern (die API-Parameter dafür gibt es).
 - **Schlanker Endpunkt für Favorit/Besucht**: Die Umschalter auf den Karten senden derzeit per `PUT` alle Felder; ein `PATCH destinations/<id>` würde reichen.
-- **Passkey-Verwaltung für Admins**: Passkeys eines Benutzers sehen und entfernen (z. B. bei verlorenem Gerät), auch über `server/cli.php`. Die Benutzerliste zeigt bereits die Anzahl.
 - **Passwortwechsel erzwingen**: Nach einem erzeugten Passwort beim ersten Login zum Ändern auffordern (z. B. Spalte `User.mustChangePassword`).
 - **Benutzerverwaltung per CLI**: `lock-user`, `unlock-user`, `delete-user` in `server/cli.php`.

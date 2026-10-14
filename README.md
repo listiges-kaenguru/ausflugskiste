@@ -43,6 +43,9 @@ Alternative erhalten. Voraussetzungen:
   Domain um, müssen sie neu angelegt werden; die Anmeldung per Passwort funktioniert weiterhin.
 - Ohne die PHP-Erweiterung `openssl` blendet die App Passkeys aus.
 
+Geht ein Gerät verloren, kann ein Admin unter **Profil → Benutzer** die Passkeys eines Benutzers einsehen und
+einzeln entfernen – oder auf der Kommandozeile mit `list-passkeys` und `delete-passkeys` (siehe unten).
+
 ### Apache
 Die mitgelieferten `.htaccess`-Dateien sperren `server/` und `data/` und setzen Sicherheits-Header.
 Dafür muss `AllowOverride All` (mindestens `AuthConfig FileInfo Indexes Options`) erlaubt sein.
@@ -105,6 +108,8 @@ php server/cli.php seed-demo
 php server/cli.php list-users
 php server/cli.php create-user <name> <passwort> [ADMIN|USER]
 php server/cli.php set-password <name> <passwort>
+php server/cli.php list-passkeys <name>
+php server/cli.php delete-passkeys <name> [<passkey-id>]   # ohne ID: alle Passkeys des Benutzers
 ```
 
 ## Backup & Restore

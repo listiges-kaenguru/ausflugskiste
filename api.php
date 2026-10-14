@@ -1,5 +1,5 @@
 <?php
-// JSON-API der App. Aufruf: api.php?r=<ressource>[/<id>[/<aktion>]]
+// JSON-API der App. Aufruf: api.php?r=<ressource>[/<id>[/<aktion>[/<unter-id>]]]
 
 declare(strict_types=1);
 
@@ -19,6 +19,7 @@ try {
     $resource = $segments[0] ?? '';
     $id = $segments[1] ?? null;
     $action = $segments[2] ?? null;
+    $subId = $segments[3] ?? null;
 
     // Schreibende Anfragen müssen per fetch() aus der App kommen (Schutz gegen CSRF).
     if ($method !== 'GET' && ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') !== 'fetch') {
@@ -62,6 +63,8 @@ try {
         $resource === 'users' && $id !== null && $action === null && $method === 'PUT' => update_user($id),
         $resource === 'users' && $id !== null && $action === null && $method === 'DELETE' => delete_user($id),
         $resource === 'users' && $id !== null && $action === 'password' && $method === 'POST' => reset_user_password($id),
+        $resource === 'users' && $id !== null && $action === 'passkeys' && $subId === null && $method === 'GET' => list_user_passkeys($id),
+        $resource === 'users' && $id !== null && $action === 'passkeys' && $subId !== null && $method === 'DELETE' => delete_user_passkey($id, $subId),
 
         default => fail(404, 'NOT_FOUND', 'Unbekannter Endpunkt'),
     };
@@ -453,6 +456,26 @@ function reset_user_password(string $id): never
     $password = generate_password();
     db()->prepare('UPDATE "User" SET passwordHash = ?, updatedAt = ? WHERE id = ?')->execute([hash_password($password), now(), $id]);
     respond(['password' => $password]);
+}
+
+/** Passkeys eines anderen Benutzers, z. B. um nach einem verlorenen Gerät einen davon zu entfernen. */
+function list_user_passkeys(string $id): never
+{
+    other_user($id);
+    $stmt = db()->prepare('SELECT * FROM "Passkey" WHERE userId = ? ORDER BY createdAt');
+    $stmt->execute([$id]);
+    respond(array_map('passkey_json', $stmt->fetchAll()));
+}
+
+function delete_user_passkey(string $id, string $passkeyId): never
+{
+    other_user($id);
+    $stmt = db()->prepare('DELETE FROM "Passkey" WHERE id = ? AND userId = ?');
+    $stmt->execute([$passkeyId, $id]);
+    if ($stmt->rowCount() === 0) {
+        fail(404, 'NOT_FOUND', 'Passkey nicht gefunden');
+    }
+    respond(['ok' => true]);
 }
 
 /** Löscht den Benutzer samt Zielen, Fotos und Passkeys (Fremdschlüssel mit ON DELETE CASCADE). */

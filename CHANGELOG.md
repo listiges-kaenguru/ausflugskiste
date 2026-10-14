@@ -8,6 +8,12 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+- **Passkeys verwalten für Admins:** Unter Profil → Benutzer zeigt ein Fingerabdruck-Button die Passkeys eines
+  Benutzers; einzelne lassen sich entfernen, z. B. nach einem verlorenen Gerät. Neue Endpunkte
+  `GET users/<id>/passkeys` und `DELETE users/<id>/passkeys/<passkeyId>`, neue CLI-Befehle
+  `list-passkeys <name>` und `delete-passkeys <name> [<passkey-id>]`.
+
 ### Geändert
 - **Lizenz:** Die App steht jetzt unter der GNU Affero General Public License v3.0 oder später (bisher GPL-3.0).
 - Anmeldeseite und Profil verlinken auf den Quelltext (`SOURCE_URL` in `server/bootstrap.php`);

@@ -44,6 +44,7 @@ const ICONS = {
   camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
   imagePlus: '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
   key: '<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+  fingerprint: '<path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/>',
   shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   unlock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
@@ -1310,7 +1311,7 @@ function passkeySection(passkeys) {
   );
 }
 
-/** Benutzerverwaltung für Admins: anlegen (mit erzeugtem Passwort), Passwort zurücksetzen, sperren, löschen. */
+/** Benutzerverwaltung für Admins: anlegen (mit erzeugtem Passwort), Passwort zurücksetzen, Passkeys entfernen, sperren, löschen. */
 function usersCard(users) {
   const list = h("ul", { class: "list" });
   const count = h("p", { class: "muted small" });
@@ -1352,6 +1353,7 @@ function usersCard(users) {
                 "span",
                 { class: "row user-actions" },
                 iconButton("key", `Neues Passwort für ${entry.username}`, () => resetPassword(entry)),
+                iconButton("fingerprint", `Passkeys von ${entry.username}`, () => managePasskeys(entry)),
                 iconButton(entry.disabled ? "unlock" : "lock", `${entry.username} ${entry.disabled ? "entsperren" : "sperren"}`, () => toggleLock(entry)),
                 iconButton("trash", `${entry.username} löschen`, () => remove(entry), "danger"),
               ),
@@ -1368,6 +1370,60 @@ function usersCard(users) {
       onConfirm: () => api(`users/${entry.id}/password`, { method: "POST" }),
     });
     if (result) await passwordDialog({ title: `Neues Passwort für ${entry.username}`, username: entry.username, password: result.password });
+  }
+
+  // Passkeys eines Benutzers ansehen und einzeln entfernen, z. B. nach einem verlorenen Gerät.
+  async function managePasskeys(entry) {
+    let passkeys;
+    try {
+      passkeys = await api(`users/${entry.id}/passkeys`);
+    } catch (error) {
+      toast(error.message, "error");
+      return;
+    }
+    const list = h("ul", { class: "list" });
+    const empty = h("p", { class: "muted" }, `${entry.username} hat keine Passkeys.`);
+
+    function renderPasskeys() {
+      list.replaceChildren(
+        ...passkeys.map((passkey) =>
+          h(
+            "li",
+            null,
+            h("span", { class: "list-icon" }, icon("key", "sm")),
+            h(
+              "div",
+              { class: "grow" },
+              h("span", null, passkey.name),
+              h("span", { class: "muted small" }, `Angelegt am ${formatDate(passkey.createdAt)}`, passkey.lastUsedAt ? ` · zuletzt genutzt am ${formatDate(passkey.lastUsedAt)}` : " · noch nicht genutzt"),
+            ),
+            iconButton("trash", `${passkey.name} entfernen`, async () => {
+              const confirmed = await confirmDialog(
+                "Passkey entfernen?",
+                `${entry.username} kann sich mit „${passkey.name}“ danach nicht mehr anmelden. Das Passwort und andere Passkeys bleiben gültig.`,
+                "Entfernen",
+              );
+              if (!confirmed) return;
+              try {
+                await api(`users/${entry.id}/passkeys/${passkey.id}`, { method: "DELETE" });
+                passkeys.splice(passkeys.indexOf(passkey), 1);
+                entry.passkeyCount = passkeys.length;
+                renderPasskeys();
+                renderList();
+                toast("Passkey entfernt");
+              } catch (error) {
+                toast(error.message, "error");
+              }
+            }, "danger"),
+          ),
+        ),
+      );
+      list.hidden = passkeys.length === 0;
+      empty.hidden = passkeys.length > 0;
+    }
+
+    renderPasskeys();
+    await dialog({ title: `Passkeys von ${entry.username}`, content: [list, empty], confirmLabel: "Schließen", cancelLabel: null });
   }
 
   async function toggleLock(entry) {
