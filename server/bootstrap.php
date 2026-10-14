@@ -4,7 +4,7 @@
 
 declare(strict_types=1);
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.2.0';
 // Link zum Quelltext, den die App allen Nutzern anzeigt (AGPL-3.0, Abschnitt 13).
 // Wer eine veränderte Fassung betreibt, muss hier auf deren Quelltext verweisen.
 const SOURCE_URL = 'https://github.com/listiges-kaenguru/ausflugsziele';

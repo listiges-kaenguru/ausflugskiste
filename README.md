@@ -6,7 +6,7 @@ Progressive Web App zur Verwaltung persönlicher Ausflugsziele.
 > **Dieses Projekt befindet sich noch in der Entwicklung.**
 > Funktionen, Datenmodell und API können sich jederzeit ohne Vorankündigung ändern.
 
-Aktuelle Version: **0.1.0** – siehe [CHANGELOG](CHANGELOG.md).
+Aktuelle Version: **0.2.0** – siehe [CHANGELOG](CHANGELOG.md).
 
 Die App kommt ohne npm, Composer, Build-Schritt und externe Bibliotheken aus:
 das Frontend ist reines HTML/CSS/JavaScript, das Backend reines PHP mit SQLite.
