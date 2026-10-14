@@ -25,7 +25,6 @@ Ziele (einzeln oder eine ganze Kategorie) mit anderen Benutzern teilen.
 - **Besuchsdatum / Notizen pro Besuch**: statt nur „besucht ja/nein“ ein Datum oder eine kleine Besuchshistorie.
 - **Offline-Fähigkeit**: Service Worker für die PWA (App-Shell cachen, Liste zuletzt geladener Ziele offline anzeigen).
 - **Export/Import**: Ziele als JSON/CSV oder GPX exportieren – auch als Backup pro Benutzer.
-- **Bilder verkleinern**: beim Upload serverseitig (GD, falls verfügbar) oder clientseitig per Canvas skalieren, um Speicher und Ladezeit zu sparen.
 - **Paginierung**: Die Zielliste lädt derzeit alles auf einmal und filtert im Browser – bei sehr vielen Zielen seitenweise laden und wieder serverseitig filtern (die API-Parameter dafür gibt es).
 - **Schlanker Endpunkt für Favorit/Besucht**: Die Umschalter auf den Karten senden derzeit per `PUT` alle Felder; ein `PATCH destinations/<id>` würde reichen.
 - **Benutzerverwaltung per CLI**: `lock-user`, `unlock-user`, `delete-user` in `server/cli.php`.

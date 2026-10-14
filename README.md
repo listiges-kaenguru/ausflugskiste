@@ -53,6 +53,8 @@ Dafür muss `AllowOverride All` (mindestens `AuthConfig FileInfo Indexes Options
 
 PHP-Einstellungen (Fehlerausgabe aus, Uploads bis 10 MB) stehen in `.user.ini` (PHP-FPM/CGI)
 bzw. in `.htaccess` (mod_php). Lässt der Hoster das nicht zu, die Werte in dessen Verwaltungsoberfläche setzen.
+Große Fotos verkleinert die App schon im Browser vor dem Hochladen (längste Seite höchstens 2560 Pixel),
+sodass auch Handyfotos über 10 MB meist problemlos hochgeladen werden können.
 
 ### Fehlersuche
 **„Die App konnte nicht geladen werden: Auf dem Server fehlt die PHP-Erweiterung pdo_sqlite“**

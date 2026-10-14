@@ -629,6 +629,48 @@ const SORTS = {
   rating: ["Beste Bewertung", (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.name.localeCompare(b.name, "de")],
 };
 
+// ---------------------------------------------------------------- Bilder verkleinern
+
+const MAX_IMAGE_SIDE = 2560;
+const SHRINK_ABOVE_BYTES = 1.5 * 1024 * 1024;
+const JPEG_QUALITY = 0.85;
+
+/**
+ * Verkleinert große Fotos vor dem Upload per Canvas (längste Seite höchstens MAX_IMAGE_SIDE).
+ * PNG bleibt PNG (Transparenz), alles andere wird JPEG; GIFs bleiben unverändert (Animation).
+ * Klappt etwas nicht oder wird die Datei nicht kleiner, wird das Original hochgeladen.
+ */
+async function shrinkImage(file) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || !window.createImageBitmap) return file;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size <= SHRINK_ABOVE_BYTES) {
+      bitmap.close();
+      return file;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const context = canvas.getContext("2d");
+    const type = file.type === "image/png" ? "image/png" : "image/jpeg";
+    if (type === "image/jpeg") {
+      // JPEG kennt keine Transparenz – sonst würden transparente WebP-Bereiche schwarz.
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, JPEG_QUALITY));
+    if (!blob || blob.size >= file.size) return file;
+    const name = type === file.type ? file.name : file.name.replace(/\.\w+$/, "") + ".jpg";
+    return new File([blob], name, { type, lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
+}
+
 async function dashboardPage({ focusSearch = false } = {}) {
   setTitle("Ziele");
   const wantsHint = supportsPasskeys() && !stored(`passkeyHintDismissed:${session.user.id}`);
@@ -934,7 +976,7 @@ async function detailPage(id) {
       uploadLabel.textContent = `Lade ${number + 1} von ${images.length} …`;
       const body = new FormData();
       body.append("destinationId", destination.id);
-      body.append("file", file);
+      body.append("file", await shrinkImage(file));
       try {
         destination.images.push(await api("images", { method: "POST", body }));
         uploaded++;

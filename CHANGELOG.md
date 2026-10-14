@@ -19,6 +19,9 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
   abgefragt, das neue muss sich vom bisherigen unterscheiden. Die Benutzerliste und `server/cli.php list-users`
   zeigen ausstehende Wechsel. Neue Spalte `User.mustChangePassword` (wird automatisch ergänzt); `me`, `login`,
   `passkey-login` und `users` liefern das Feld `mustChangePassword`.
+- **Bilder verkleinern:** Fotos werden vor dem Upload im Browser per Canvas auf höchstens 2560 Pixel
+  Kantenlänge verkleinert (JPEG mit Qualität 0,85, PNG bleibt PNG, GIFs bleiben unverändert). Das spart Speicher
+  und Ladezeit; größere Handyfotos passen so unter die Upload-Grenze. Bereits gespeicherte Fotos bleiben unverändert.
 
 ### Geändert
 - **Lizenz:** Die App steht jetzt unter der GNU Affero General Public License v3.0 oder später (bisher GPL-3.0).
