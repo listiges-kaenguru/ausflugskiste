@@ -6,6 +6,17 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzeit ändern.
 
+## [Unveröffentlicht]
+
+### Behoben
+- Nach einem Update zeigte der Browser oft noch die alte Version, bis die Seite neu geladen wurde. Die
+  `.htaccess` setzt jetzt `Cache-Control: no-cache` für statische Dateien (HTML, JS, CSS, Icons, Manifest); der
+  Browser prüft sie bei jedem Aufruf kurz beim Server. API-Antworten (`no-store`) und Fotos behalten ihre Werte.
+
+### Geändert
+- Release-Archive enthalten nur noch, was für den Betrieb gebraucht wird, dazu README und LICENSE
+  (`export-ignore` in `.gitattributes`).
+
 ## [0.3.0] – 2026-10-15
 
 ### Geändert
