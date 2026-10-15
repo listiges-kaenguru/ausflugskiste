@@ -4,10 +4,10 @@
 
 declare(strict_types=1);
 
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 // Link zum Quelltext, den die App allen Nutzern anzeigt (AGPL-3.0, Abschnitt 13).
 // Wer eine veränderte Fassung betreibt, muss hier auf deren Quelltext verweisen.
-const SOURCE_URL = 'https://github.com/listiges-kaenguru/ausflugsziele';
+const SOURCE_URL = 'https://github.com/listiges-kaenguru/ausflugskiste';
 const SESSION_LIFETIME = 60 * 60 * 24 * 7;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = [
@@ -21,6 +21,7 @@ function data_dir(): string
 {
     static $dir = null;
     if ($dir === null) {
+        // Name der Variablen aus der Zeit vor der Umbenennung, damit bestehende Installationen weiterlaufen
         $path = getenv('AUSFLUGSZIELE_DATA_DIR') ?: dirname(__DIR__) . '/data';
         // SQLite braucht Schreibrechte auf Datei und Verzeichnis (für das Journal).
         foreach ([$path, "$path/uploads", "$path/sessions", "$path/app.db"] as $entry) {
@@ -43,7 +44,7 @@ function data_dir_error(string $path): never
     $user = function_exists('posix_geteuid') && function_exists('posix_getpwuid')
         ? (posix_getpwuid(posix_geteuid())['name'] ?? (string) posix_geteuid())
         : 'unbekannt';
-    error_log("Ausflugsziele: Keine Schreibrechte für $path (PHP läuft als Benutzer $user)");
+    error_log("Ausflugskiste: Keine Schreibrechte für $path (PHP läuft als Benutzer $user)");
     $where = getenv('AUSFLUGSZIELE_DATA_DIR') ? 'das Datenverzeichnis (AUSFLUGSZIELE_DATA_DIR)' : 'den Ordner data/';
     throw new ApiException(500, 'SETUP_ERROR', "Der Webserver darf nicht in $where schreiben. Bitte Schreibrechte für den Webserver-Benutzer vergeben (siehe README, Abschnitt Installation).");
 }
@@ -54,7 +55,7 @@ function db(): PDO
     if ($pdo === null) {
         // Fehlt die Erweiterung, scheitert „new PDO“ sonst nur mit „Interner Fehler“.
         if (!class_exists(PDO::class) || !in_array('sqlite', PDO::getAvailableDrivers(), true)) {
-            error_log('Ausflugsziele: PHP-Erweiterung pdo_sqlite fehlt (php ' . PHP_VERSION . ', ' . (php_ini_loaded_file() ?: 'keine php.ini') . ')');
+            error_log('Ausflugskiste: PHP-Erweiterung pdo_sqlite fehlt (php ' . PHP_VERSION . ', ' . (php_ini_loaded_file() ?: 'keine php.ini') . ')');
             throw new ApiException(500, 'SETUP_ERROR', 'Auf dem Server fehlt die PHP-Erweiterung pdo_sqlite. Bitte installieren bzw. aktivieren (z. B. Paket php-pdo oder php-sqlite3, siehe README, Abschnitt Fehlersuche).');
         }
         $pdo = new PDO('sqlite:' . data_dir() . '/app.db', null, null, [

@@ -1,4 +1,4 @@
-// Ausflugsziele – Frontend ohne Build-Schritt und ohne Abhängigkeiten.
+// Ausflugskiste – Frontend ohne Build-Schritt und ohne Abhängigkeiten.
 // Routing über den URL-Hash (#/…), damit kein Server-Rewrite nötig ist.
 
 "use strict";
@@ -121,7 +121,7 @@ function go(path) {
 }
 
 function setTitle(title) {
-  document.title = title ? `${title} · Ausflugsziele` : "Ausflugsziele";
+  document.title = title ? `${title} · Ausflugskiste` : "Ausflugskiste";
 }
 
 /** Bindet ein Formular an einen async-Handler mit Lade- und Fehlerzustand. */
@@ -606,7 +606,7 @@ function randomDestinationDialog(destinations) {
   roll();
   dialog({
     title: "Wohin heute?",
-    text: open.length ? "Ein noch nicht besuchtes Ziel aus deiner aktuellen Auswahl:" : "Hier warst du schon überall – wie wäre es mit einem Wiedersehen?",
+    text: open.length ? "Ein Griff in die Kiste – ein noch nicht besuchtes Ziel aus deiner aktuellen Auswahl:" : "Hier warst du schon überall – wie wäre es mit einem Wiedersehen?",
     content: [preview, pool.length > 1 ? h("button", { type: "button", class: "btn ghost small reroll", onclick: roll }, icon("dice", "sm"), "Nochmal würfeln") : null],
     confirmLabel: "Ansehen",
     cancelLabel: "Schließen",
@@ -696,8 +696,8 @@ async function dashboardPage({ focusSearch = false } = {}) {
         "div",
         { class: "empty" },
         h("span", { class: "section-icon" }, icon("compass", "lg")),
-        h("h2", null, "Noch keine Ziele gespeichert"),
-        h("p", null, "Sammle Orte, die du besuchen möchtest – mit Fotos, Bewertung und Notizen."),
+        h("h2", null, "Deine Kiste ist noch leer"),
+        h("p", null, "Leg dein erstes Ausflugsziel hinein – mit Fotos, Bewertung und Notizen."),
         h("a", { href: "#/new", class: "btn" }, icon("add", "sm"), "Erstes Ziel anlegen"),
       ),
     ];
@@ -1655,7 +1655,7 @@ function appFooter() {
   return h(
     "p",
     { class: "footer-note" },
-    session.version ? `Ausflugsziele ${session.version} · ` : "Ausflugsziele · ",
+    session.version ? `Ausflugskiste ${session.version} · ` : "Ausflugskiste · ",
     h("a", { href: session.sourceUrl, target: "_blank", rel: "noopener" }, "Quelltext"),
     " · Lizenz: AGPL-3.0",
   );

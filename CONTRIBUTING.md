@@ -1,6 +1,6 @@
 # Mitwirken
 
-Danke, dass du zu Ausflugsziele beitragen möchtest! Diese Anleitung erklärt, wie du die App lokal startest
+Danke, dass du zur Ausflugskiste beitragen möchtest! Diese Anleitung erklärt, wie du die App lokal startest
 und worauf bei Änderungen zu achten ist.
 
 ## Grundsatz: keine Abhängigkeiten
@@ -19,8 +19,8 @@ Deshalb gilt:
 Voraussetzung ist PHP 8.1 oder neuer.
 
 ```sh
-git clone https://github.com/listiges-kaenguru/ausflugsziele.git
-cd ausflugsziele
+git clone https://github.com/listiges-kaenguru/ausflugskiste.git
+cd ausflugskiste
 php server/cli.php seed-demo   # optional: legt admin und demo an und zeigt die Passwörter an
 php -S localhost:8000
 ```
@@ -117,7 +117,7 @@ Versionen folgen [Semantic Versioning](https://semver.org/lang/de/) und werden a
 ## Sicherheitslücken
 
 Sicherheitsprobleme bitte **nicht** als öffentliches Issue melden, sondern vertraulich über
-[GitHub Security Advisories](https://github.com/listiges-kaenguru/ausflugsziele/security/advisories/new).
+[GitHub Security Advisories](https://github.com/listiges-kaenguru/ausflugskiste/security/advisories/new).
 
 ## Lizenz
 

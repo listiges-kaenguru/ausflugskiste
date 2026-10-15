@@ -6,6 +6,20 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzeit ändern.
 
+## [0.3.0] – 2026-10-15
+
+### Geändert
+- **Neuer Name: Ausflugskiste** – „Deine Schatzkiste für freie Tage.“ Titel, Kopfzeile (Wortmarke mit
+  „kiste“ in Holzfarbe), Manifest (`name` „Ausflugskiste“, `short_name` „Ausflüge“), Fußzeile, Anzeigename neuer
+  Passkeys und Log-Einträge tragen den neuen Namen. Das Repository heißt jetzt `listiges-kaenguru/ausflugskiste`
+  (`SOURCE_URL`); GitHub leitet alte Links weiter.
+- **Neues Icon:** Truhe mit Kompass als Schloss, weiterhin auf dunklem Grund (`icon.svg`, `icon-192.png`,
+  `icon-512.png`, `favicon.ico`).
+- **Farben:** heller Hintergrund und Flächen in warmem Creme statt kühlem Grau; Grün und Sterne unverändert.
+- **Texte:** Leere Liste „Deine Kiste ist noch leer“, „Wohin heute?“ beginnt mit „Ein Griff in die Kiste“.
+- **Bewusst unverändert:** Umgebungsvariable `AUSFLUGSZIELE_DATA_DIR`, Datenbank, Sitzungs-Cookie. Bestehende
+  Installationen laufen ohne Anpassung weiter; vorhandene Passkeys behalten ihren alten Anzeigenamen.
+
 ## [0.2.0] – 2026-10-14
 
 ### Hinzugefügt
@@ -146,6 +160,7 @@ Erste versionierte Veröffentlichung. Die App läuft jetzt ohne npm, Framework u
 Ursprüngliche, nicht versionierte Fassung als Next.js-PWA mit Prisma, Login, Ausflugszielen, Tags und
 Bild-Upload-API (Commit [`96d0982`](https://github.com/listiges-kaenguru/ausflugsziele/commit/96d0982)).
 
+[0.3.0]: https://github.com/listiges-kaenguru/ausflugskiste/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.2...v0.0.3

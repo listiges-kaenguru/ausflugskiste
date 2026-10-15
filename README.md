@@ -1,12 +1,16 @@
-# Ausflugsziele
+# Ausflugskiste
 
-Progressive Web App zur Verwaltung persönlicher Ausflugsziele.
+**Deine Schatzkiste für freie Tage.** Progressive Web App, um Ausflugsziele zu sammeln, zu bewerten und
+wiederzufinden – mit Fotos, Notizen, Tags und dem Zufallsvorschlag „Wohin heute?“.
+
+> Bis Version 0.2.0 hieß die App **Ausflugsziele**, das Repository `ausflugsziele`. Alte Links auf GitHub leiten
+> automatisch weiter; Datenbank, Daten und die Umgebungsvariable `AUSFLUGSZIELE_DATA_DIR` bleiben unverändert.
 
 > [!WARNING]
 > **Dieses Projekt befindet sich noch in der Entwicklung.**
 > Funktionen, Datenmodell und API können sich jederzeit ohne Vorankündigung ändern.
 
-Aktuelle Version: **0.2.0** – siehe [CHANGELOG](CHANGELOG.md).
+Aktuelle Version: **0.3.0** – siehe [CHANGELOG](CHANGELOG.md).
 
 Die App kommt ohne npm, Composer, Build-Schritt und externe Bibliotheken aus:
 das Frontend ist reines HTML/CSS/JavaScript, das Backend reines PHP mit SQLite.
@@ -70,7 +74,7 @@ sudo restorecon -R /pfad/zur/app
 ```
 
 **„Interner Fehler“** – die genaue Ursache steht im Fehlerprotokoll des Webservers
-(z. B. `/var/log/httpd/error_log` bzw. `/var/log/apache2/error.log`, Einträge beginnen mit `Ausflugsziele`).
+(z. B. `/var/log/httpd/error_log` bzw. `/var/log/apache2/error.log`, Einträge beginnen mit `Ausflugskiste`).
 
 ### nginx
 nginx liest keine `.htaccess`-Dateien. Die internen Ordner müssen selbst gesperrt werden:
@@ -87,8 +91,8 @@ location = /api.php {
 ```
 
 ### Datenverzeichnis außerhalb des Webroots (empfohlen, falls möglich)
-Über die Umgebungsvariable `AUSFLUGSZIELE_DATA_DIR` kann ein anderer Speicherort gesetzt werden,
-z. B. in Apache mit `SetEnv AUSFLUGSZIELE_DATA_DIR /var/lib/ausflugsziele`.
+Über die Umgebungsvariable `AUSFLUGSZIELE_DATA_DIR` (Name aus der Zeit vor der Umbenennung) kann ein anderer Speicherort gesetzt werden,
+z. B. in Apache mit `SetEnv AUSFLUGSZIELE_DATA_DIR /var/lib/ausflugskiste`.
 
 ## Lokale Entwicklung
 PHP bringt einen eingebauten Entwicklungsserver mit:
