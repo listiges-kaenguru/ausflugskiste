@@ -28,4 +28,7 @@ AddType application/manifest+json .webmanifest
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
     Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    # Statische Dateien vor jeder Verwendung beim Server prüfen lassen (unverändert → 304), damit nach einem
+    # Update ohne F5 die neue Version erscheint. setifempty: Was PHP selbst setzt (API no-store, Fotos), bleibt.
+    Header setifempty Cache-Control "no-cache"
 </IfModule>
