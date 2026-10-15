@@ -2,12 +2,12 @@
 
 :root {
   color-scheme: light dark;
-  --bg: #f5f7f6;
+  --bg: #fbf7ef;
   --surface: #ffffff;
-  --surface-2: #eef2f0;
-  --surface-3: #e3e9e6;
-  --border: #e2e8e5;
-  --border-strong: #cbd5d0;
+  --surface-2: #f4eee3;
+  --surface-3: #eae2d4;
+  --border: #e9e0d0;
+  --border-strong: #d6cab5;
   --text: #101614;
   --text-2: #34403b;
   --muted: #5d6a64;
@@ -20,11 +20,12 @@
   --danger: #e11d48;
   --danger-soft: rgb(225 29 72 / 0.1);
   --star: #f59e0b;
+  --wood: #b45309;
   --shadow-sm: 0 1px 2px rgb(16 22 20 / 0.06);
   --shadow: 0 1px 2px rgb(16 22 20 / 0.04), 0 8px 24px -12px rgb(16 22 20 / 0.18);
   --shadow-lg: 0 24px 64px -16px rgb(16 22 20 / 0.35);
   --overlay: rgb(10 14 12 / 0.55);
-  --topbar-bg: rgb(245 247 246 / 0.82);
+  --topbar-bg: rgb(251 247 239 / 0.82);
   --radius: 1.25rem;
   --radius-sm: 0.875rem;
   --radius-xs: 0.6rem;
@@ -55,6 +56,7 @@
     --danger: #fb7185;
     --danger-soft: rgb(251 113 133 / 0.12);
     --star: #fbbf24;
+    --wood: #fbbf24;
     --shadow-sm: none;
     --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset;
     --shadow-lg: 0 24px 64px -12px rgb(0 0 0 / 0.7);
@@ -125,6 +127,7 @@ main:focus { outline: none; }
 }
 .brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: -0.01em; }
 .brand img { border-radius: 0.5rem; }
+.brand-kiste { color: var(--wood); font-weight: 800; }
 
 /* Mobil: Navigation als Leiste am unteren Rand */
 .nav {

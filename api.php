@@ -71,7 +71,7 @@ try {
 } catch (ApiException $error) {
     respond_error($error);
 } catch (Throwable $error) {
-    error_log('Ausflugsziele API: ' . $error);
+    error_log('Ausflugskiste API: ' . $error);
     respond_error(new ApiException(500, 'INTERNAL_ERROR', 'Interner Fehler'));
 }
 
@@ -282,7 +282,7 @@ function passkey_register_options(): never
 
     respond([
         'challenge' => webauthn_challenge('register'),
-        'rp' => ['id' => webauthn_rp_id(), 'name' => 'Ausflugsziele'],
+        'rp' => ['id' => webauthn_rp_id(), 'name' => 'Ausflugskiste'],
         'user' => ['id' => base64url_encode($user['id']), 'name' => $user['username'], 'displayName' => $user['username']],
         'pubKeyCredParams' => [
             ['type' => 'public-key', 'alg' => COSE_ALG_ES256],

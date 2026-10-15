@@ -1,7 +1,7 @@
 {
-  "name": "Ausflugsziele",
-  "short_name": "Ausflugsziele",
-  "description": "Persönliche Sammlung von Ausflugszielen",
+  "name": "Ausflugskiste",
+  "short_name": "Ausflüge",
+  "description": "Deine Schatzkiste für freie Tage: Ausflugsziele sammeln, bewerten und wiederfinden",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#09090b",

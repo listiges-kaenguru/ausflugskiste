@@ -1,7 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- Quelle für favicon.ico, icon-192.png und icon-512.png (siehe CONTRIBUTING.md) -->
-  <rect width="512" height="512" rx="112" fill="#09090b"/>
-  <circle cx="256" cy="256" r="176" fill="none" stroke="#10b981" stroke-width="32"/>
-  <path d="M330.6 181.4 298.9 276.6a35.2 35.2 0 0 1-22.3 22.3L181.4 330.6l31.8-95.2a35.2 35.2 0 0 1 22.3-22.3z" fill="#10b981" stroke="#10b981" stroke-width="12" stroke-linejoin="round"/>
-  <circle cx="256" cy="256" r="16" fill="#09090b"/>
+  <!-- Ausflugskiste: Truhe mit Kompass als Schloss -->
+  <rect width="512" height="512" rx="112" fill="#0b0d0c"/>
+  <path d="M100 236v-36c0-52 40-86 96-86h120c56 0 96 34 96 86v36z" fill="#f59e0b"/>
+  <rect x="100" y="236" width="312" height="172" rx="26" fill="#d97706"/>
+  <rect x="100" y="222" width="312" height="30" fill="#92400e"/>
+  <rect x="150" y="116" width="30" height="292" fill="#92400e" opacity=".55"/>
+  <rect x="332" y="116" width="30" height="292" fill="#92400e" opacity=".55"/>
+  <circle cx="256" cy="262" r="62" fill="#10b981" stroke="#0b0d0c" stroke-width="10"/>
+  <path d="M256 216l17 46h-34z" fill="#0b0d0c"/>
+  <path d="M256 308l-17-46h34z" fill="#0b0d0c" opacity=".45"/>
 </svg>
