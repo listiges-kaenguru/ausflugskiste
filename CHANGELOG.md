@@ -8,6 +8,10 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+- `BENUTZERHANDBUCH.md`: die Anleitung für Nutzer und Administratoren liegt jetzt im App-Repo und damit auch in
+  der Release-ZIP. Bisher stand sie nur auf der Projektseite, die sie künftig aus dieser Datei baut.
+
 ### Geändert
 - Code aufgeräumt, ohne Änderung an Oberfläche, Verhalten oder API: ungenutztes Icon und CSS-Regeln entfernt,
   doppelte Bausteine zusammengefasst (Kopieren-Button, Passkey-Listeneintrag, Adresszeile, Passwortprüfung,

@@ -6,6 +6,8 @@ Projekt `../ausflugskiste-web` (<https://ausflugskiste.schmaralde.de/>), Demo im
 ## Orientierung
 
 - `README.md` – Installation, Betrieb, API, Projektstruktur
+- `BENUTZERHANDBUCH.md` – Bedienung für Nutzer und Admins, du-Form, ohne Technikjargon (Quelle der Anleitung auf
+  der Projektseite, daher nicht verschieben; Kapitelnummern und -titel bestimmen dort die Seiten)
 - `CHANGELOG.md` – Änderungen je Version; jede Änderung unter `## [Unveröffentlicht]` eintragen
 - `IDEEN.md` – ToDo und Ideen; **zuerst lesen**, Erledigtes ins CHANGELOG
 - `CONTRIBUTING.md` – Richtlinien, Prüfungen vor dem Pull Request, Release-Ablauf
@@ -25,6 +27,7 @@ Die App läuft bewusst **ohne Abhängigkeiten und ohne Build-Schritt** auf einem
 
 ## Abhängige Projekte
 
-- Neue oder geänderte Funktionen auch auf der Projektseite und in der Anleitung (`../ausflugskiste-web`) beschreiben.
+- Bei sichtbaren Änderungen `BENUTZERHANDBUCH.md` anpassen (Knopf-Beschriftungen exakt wie in der UI). Neue oder
+  geänderte Funktionen auch auf der Projektseite (`../ausflugskiste-web`) beschreiben.
 - Nach jedem Release: `../ausflugskiste-web/scripts/build-download.sh` und `../ausflugskiste-demo/scripts/build.sh`
   ausführen (neue Dateien der App dort in `FILES` ergänzen), committen und an den Upload erinnern.

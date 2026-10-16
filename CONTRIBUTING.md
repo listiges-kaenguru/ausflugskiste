@@ -78,7 +78,9 @@ docker run --rm -p 8080:80 -v "$PWD":/var/www/html php:8.1-apache
    Ohne passendes Gerät hilft der virtuelle Authenticator der Chrome-Entwicklertools
    (*Weitere Tools → WebAuthn*).
 3. Bei API-Änderungen die Tabelle im [README](README.md#api) anpassen.
-4. Einen Eintrag unter `## [Unveröffentlicht]` im [CHANGELOG](CHANGELOG.md) ergänzen
+4. Bei sichtbaren Änderungen das [Benutzerhandbuch](BENUTZERHANDBUCH.md) anpassen (Knopf-Beschriftungen exakt
+   wie in der Oberfläche), bei Installation und Betrieb die README.
+5. Einen Eintrag unter `## [Unveröffentlicht]` im [CHANGELOG](CHANGELOG.md) ergänzen
    (Abschnitt anlegen, falls er fehlt).
 
 ## Commits und Branches
