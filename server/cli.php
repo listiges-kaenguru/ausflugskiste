@@ -5,6 +5,7 @@
 //   php server/cli.php list-users
 //   php server/cli.php list-passkeys <benutzername>
 //   php server/cli.php delete-passkeys <benutzername> [<passkey-id>]   (ohne ID: alle)
+//   php server/cli.php disable-totp <benutzername>   (Zwei-Faktor-Anmeldung abschalten, z. B. nach Handyverlust)
 //   php server/cli.php seed-demo        (nur für die lokale Entwicklung, gibt zufällige Passwörter aus)
 
 declare(strict_types=1);
@@ -48,8 +49,8 @@ switch ($command) {
         break;
 
     case 'list-users':
-        foreach (db()->query('SELECT username, role, createdAt, disabledAt, mustChangePassword FROM "User" ORDER BY username') as $user) {
-            $status = ($user['disabledAt'] === null ? '' : "\tgesperrt") . ($user['mustChangePassword'] ? "\tPasswortwechsel ausstehend" : '');
+        foreach (db()->query('SELECT username, role, createdAt, disabledAt, mustChangePassword, totpSecret IS NOT NULL AS totp FROM "User" ORDER BY username') as $user) {
+            $status = ($user['disabledAt'] === null ? '' : "\tgesperrt") . ($user['mustChangePassword'] ? "\tPasswortwechsel ausstehend" : '') . ($user['totp'] ? "\t2FA" : '');
             echo "{$user['username']}\t{$user['role']}\t{$user['createdAt']}$status\n";
         }
         break;
@@ -77,13 +78,20 @@ switch ($command) {
         echo $stmt->rowCount() === 1 ? "1 Passkey entfernt.\n" : "{$stmt->rowCount()} Passkeys entfernt.\n";
         break;
 
+    case 'disable-totp':
+        $userId = cli_user_id($argv[2] ?? '');
+        db()->prepare('UPDATE "User" SET totpSecret = NULL, totpLastStep = NULL, totpRecoveryCodes = NULL, updatedAt = ? WHERE id = ?')
+            ->execute([now(), $userId]);
+        echo "Zwei-Faktor-Anmeldung für {$argv[2]} abgeschaltet.\n";
+        break;
+
     case 'seed-demo':
         seed_demo();
         echo "Demo-Daten angelegt.\n";
         break;
 
     default:
-        echo "Befehle: create-user, set-password, list-users, list-passkeys, delete-passkeys, seed-demo\n";
+        echo "Befehle: create-user, set-password, list-users, list-passkeys, delete-passkeys, disable-totp, seed-demo\n";
         exit(1);
 }
 

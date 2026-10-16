@@ -8,6 +8,21 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+- **Zwei-Faktor-Anmeldung (TOTP):** Unter Profil → Anmeldung & Sicherheit lässt sich eine Authenticator-App
+  einrichten (QR-Code, alternativ Link oder Schlüssel zum Abtippen). Danach fragt die Anmeldung mit Passwort
+  zusätzlich nach dem sechsstelligen Code; die Anmeldung mit Passkey bleibt ohne Code. Zehn
+  Wiederherstellungscodes (einmalig angezeigt, zum Kopieren oder Herunterladen) helfen, wenn das Handy fehlt;
+  neue lassen sich jederzeit erzeugen. Abschalten und neue Codes verlangen einen gültigen Code. Jeder Code gilt
+  nur einmal, höchstens 5 Fehlversuche in 5 Minuten je Benutzer. Der QR-Code entsteht im Browser ohne
+  externe Bibliothek.
+- Admins können die Zwei-Faktor-Anmeldung eines Benutzers unter Profil → Benutzer abschalten (z. B. nach
+  Handyverlust); die Benutzerliste zeigt „2FA aktiv“. Neuer CLI-Befehl `disable-totp <name>`, `list-users`
+  zeigt „2FA“.
+- Neue Endpunkte `login/totp`, `totp` (GET/POST/DELETE), `totp/setup`, `totp/recovery-codes` und
+  `DELETE users/<id>/totp`; `me` und `users` liefern `totpEnabled`. Die Datenbank erhält dafür drei neue
+  Spalten in `User` (werden beim ersten Aufruf automatisch ergänzt).
+
 ### Behoben
 - Nach einem Update zeigte der Browser oft noch die alte Version, bis die Seite neu geladen wurde. Die
   `.htaccess` setzt jetzt `Cache-Control: no-cache` für statische Dateien (HTML, JS, CSS, Icons, Manifest); der

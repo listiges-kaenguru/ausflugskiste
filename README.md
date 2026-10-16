@@ -51,6 +51,19 @@ Alternative erhalten. Voraussetzungen:
 Geht ein Gerät verloren, kann ein Admin unter **Profil → Benutzer** die Passkeys eines Benutzers einsehen und
 einzeln entfernen – oder auf der Kommandozeile mit `list-passkeys` und `delete-passkeys` (siehe unten).
 
+### Zwei-Faktor-Anmeldung (TOTP)
+Unter **Profil → Anmeldung & Sicherheit** lässt sich zusätzlich zum Passwort ein Einmalcode aus einer
+Authenticator-App einrichten (z. B. Aegis, 2FAS, Google oder Microsoft Authenticator, viele Passwortmanager):
+QR-Code scannen, einen Code zur Bestätigung eingeben, fertig. Danach fragt die App bei jeder Anmeldung mit
+Passwort nach dem aktuellen Code. Die Anmeldung mit Passkey bleibt ohne Code möglich – ein Passkey vereint
+Besitz (Gerät) und Fingerabdruck bzw. PIN bereits in sich.
+- Beim Einrichten erzeugt die App zehn **Wiederherstellungscodes**, die nur einmal angezeigt werden und je
+  einmal statt des App-Codes funktionieren. Neue Codes gibt es jederzeit im Profil (die alten werden ungültig).
+- Die Uhr des Servers muss stimmen (Abweichung höchstens etwa 30 Sekunden), sonst passen die Codes nicht.
+- Höchstens 5 falsche Codes in 5 Minuten je Benutzer, jeder Code gilt nur einmal.
+- Ist das Handy weg und sind keine Wiederherstellungscodes zur Hand, schaltet ein Admin die
+  Zwei-Faktor-Anmeldung unter **Profil → Benutzer** ab – oder auf der Kommandozeile mit `disable-totp`.
+
 ### Apache
 Die mitgelieferten `.htaccess`-Dateien sperren `server/` und `data/` und setzen Sicherheits-Header.
 Dafür muss `AllowOverride All` (mindestens `AuthConfig FileInfo Indexes Options`) erlaubt sein.
@@ -117,6 +130,7 @@ php server/cli.php create-user <name> <passwort> [ADMIN|USER]
 php server/cli.php set-password <name> <passwort>
 php server/cli.php list-passkeys <name>
 php server/cli.php delete-passkeys <name> [<passkey-id>]   # ohne ID: alle Passkeys des Benutzers
+php server/cli.php disable-totp <name>                      # Zwei-Faktor-Anmeldung abschalten
 ```
 
 ## Backup & Restore
@@ -142,7 +156,11 @@ Binärdaten der Passkey-Endpunkte (Challenge, Schlüssel-IDs, Antworten des Brow
 | --- | --- | --- |
 | GET | `me` | Angemeldeter Benutzer und ob die Ersteinrichtung aussteht |
 | POST | `setup` | Ersten Admin anlegen (nur solange es keine Benutzer gibt) |
-| POST | `login`, `logout`, `change-password` | Anmeldung und Passwort |
+| POST | `login`, `logout`, `change-password` | Anmeldung und Passwort – mit Zwei-Faktor-Anmeldung antwortet `login` mit `{ "totpRequired": true }` |
+| POST | `login/totp` | Zweiter Anmeldeschritt: `{ "code" }` – App-Code oder Wiederherstellungscode |
+| GET/POST/DELETE | `totp` | Status der Zwei-Faktor-Anmeldung / mit `{ "code" }` aktivieren (liefert einmalig `recoveryCodes`) / mit `{ "code" }` abschalten |
+| POST | `totp/setup` | Neues Geheimnis (`secret`, `uri` für den QR-Code) – aktiv erst nach Bestätigung per `POST totp` |
+| POST | `totp/recovery-codes` | Mit `{ "code" }` neue Wiederherstellungscodes erzeugen |
 | POST | `passkey-login/options`, `passkey-login` | Anmeldung per Passkey: Challenge abrufen / Antwort des Browsers prüfen |
 | GET/POST | `passkeys` | Eigene Passkeys auflisten / neuen Passkey speichern |
 | POST | `passkeys/options` | Optionen zum Anlegen eines Passkeys |
@@ -154,14 +172,15 @@ Binärdaten der Passkey-Endpunkte (Challenge, Schlüssel-IDs, Antworten des Brow
 | POST | `images` | Bild hochladen (`multipart/form-data`: `destinationId`, `file`) |
 | GET | `images/<id>/file` | Bild abrufen |
 | DELETE | `images/<id>` | Bild löschen |
-| GET/POST | `users` | Benutzer auflisten (mit `disabled`, `destinationCount`, `passkeyCount`) / anlegen – ohne `password` erzeugt der Server eines und liefert es einmalig zurück (nur Admin) |
+| GET/POST | `users` | Benutzer auflisten (mit `disabled`, `destinationCount`, `passkeyCount`, `totpEnabled`) / anlegen – ohne `password` erzeugt der Server eines und liefert es einmalig zurück (nur Admin) |
 | PUT/DELETE | `users/<id>` | Benutzer sperren bzw. entsperren (`{ "disabled": true }`) / samt Zielen, Fotos und Passkeys löschen (nur Admin, nicht das eigene Konto) |
 | POST | `users/<id>/password` | Neues Passwort erzeugen und einmalig zurückgeben (nur Admin, nicht das eigene Konto) |
+| DELETE | `users/<id>/totp` | Zwei-Faktor-Anmeldung eines Benutzers abschalten (nur Admin, nicht das eigene Konto) |
 
 ## Projektstruktur
 - `index.html`, `assets/` – Frontend (Single-Page-App mit Hash-Routing)
 - `api.php` – JSON-API
-- `server/` – PHP-Hilfsfunktionen, Validierung, Passkeys (WebAuthn) und Kommandozeilen-Skript
+- `server/` – PHP-Hilfsfunktionen, Validierung, Passkeys (WebAuthn), Zwei-Faktor-Anmeldung (TOTP) und Kommandozeilen-Skript
 - `data/` – Datenbank, Sessions und Uploads (wird automatisch angelegt, nicht öffentlich)
 
 ## Mitwirken
