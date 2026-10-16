@@ -184,6 +184,11 @@ Binärdaten der Passkey-Endpunkte (Challenge, Schlüssel-IDs, Antworten des Brow
 | POST | `users/<id>/password` | Neues Passwort erzeugen und einmalig zurückgeben (nur Admin, nicht das eigene Konto) |
 | DELETE | `users/<id>/totp` | Zwei-Faktor-Anmeldung eines Benutzers abschalten (nur Admin, nicht das eigene Konto) |
 
+## Anleitung für Nutzer
+Die Bedienung der App (Ziele anlegen, Fotos, Suche, „Wohin heute?“, Profil mit Passkeys und Zwei-Faktor-Anmeldung,
+Administration) beschreibt das **[Benutzerhandbuch](BENUTZERHANDBUCH.md)**. Es eignet sich zum Weitergeben an
+alle, die die App nutzen, und steht auch auf <https://ausflugskiste.schmaralde.de/anleitung/>.
+
 ## Projektstruktur
 - `index.html`, `assets/` – Frontend (Single-Page-App mit Hash-Routing)
 - `api.php` – JSON-API
