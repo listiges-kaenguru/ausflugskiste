@@ -32,9 +32,7 @@ switch ($command) {
         if (strlen($username) < 3 || strlen($password) < 6) {
             exit("Benutzername mindestens 3, Passwort mindestens 6 Zeichen.\n");
         }
-        $timestamp = now();
-        db()->prepare('INSERT INTO "User" (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)')
-            ->execute([uuid(), $username, hash_password($password), $role, $timestamp, $timestamp]);
+        cli_insert_user($username, $password, $role);
         echo "Benutzer $username ($role) angelegt.\n";
         break;
 
@@ -71,10 +69,13 @@ switch ($command) {
     case 'delete-passkeys':
         $userId = cli_user_id($argv[2] ?? '');
         $passkeyId = $argv[3] ?? null;
-        $stmt = $passkeyId === null
-            ? db()->prepare('DELETE FROM "Passkey" WHERE userId = ?')
-            : db()->prepare('DELETE FROM "Passkey" WHERE userId = ? AND id = ?');
-        $stmt->execute($passkeyId === null ? [$userId] : [$userId, $passkeyId]);
+        if ($passkeyId === null) {
+            $stmt = db()->prepare('DELETE FROM "Passkey" WHERE userId = ?');
+            $stmt->execute([$userId]);
+        } else {
+            $stmt = db()->prepare('DELETE FROM "Passkey" WHERE userId = ? AND id = ?');
+            $stmt->execute([$userId, $passkeyId]);
+        }
         echo $stmt->rowCount() === 1 ? "1 Passkey entfernt.\n" : "{$stmt->rowCount()} Passkeys entfernt.\n";
         break;
 
@@ -95,15 +96,29 @@ switch ($command) {
         exit(1);
 }
 
-function cli_user_id(string $username): string
+function find_user_id(string $username): ?string
 {
     $stmt = db()->prepare('SELECT id FROM "User" WHERE username = ?');
     $stmt->execute([$username]);
-    $id = $stmt->fetchColumn();
-    if ($id === false) {
+    return $stmt->fetchColumn() ?: null;
+}
+
+function cli_user_id(string $username): string
+{
+    $id = find_user_id($username);
+    if ($id === null) {
         fwrite(STDERR, "Benutzer $username nicht gefunden.\n");
         exit(1);
     }
+    return $id;
+}
+
+function cli_insert_user(string $username, string $password, string $role): string
+{
+    $id = uuid();
+    $timestamp = now();
+    db()->prepare('INSERT INTO "User" (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)')
+        ->execute([$id, $username, hash_password($password), $role, $timestamp, $timestamp]);
     return $id;
 }
 
@@ -112,22 +127,18 @@ function seed_demo(): void
     $timestamp = now();
     $userIds = [];
     foreach (['admin' => 'ADMIN', 'demo' => 'USER'] as $username => $role) {
-        $stmt = db()->prepare('SELECT id FROM "User" WHERE username = ?');
-        $stmt->execute([$username]);
-        $userIds[$username] = $stmt->fetchColumn() ?: null;
+        $userIds[$username] = find_user_id($username);
         if ($userIds[$username] === null) {
             // Keine festen Zugangsdaten im Code: Passwort zufällig erzeugen und einmalig anzeigen.
             $password = bin2hex(random_bytes(6));
             echo "Benutzer $username ($role) angelegt, Passwort: $password\n";
-            $userIds[$username] = uuid();
-            db()->prepare('INSERT INTO "User" (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)')
-                ->execute([$userIds[$username], $username, hash_password($password), $role, $timestamp, $timestamp]);
+            $userIds[$username] = cli_insert_user($username, $password, $role);
         }
     }
 
+    $insertTag = db()->prepare('INSERT OR IGNORE INTO "Tag" (id, name, createdAt, updatedAt) VALUES (?, ?, ?, ?)');
     foreach (['Natur', 'Kultur', 'Food', 'Familie', 'Weekend'] as $name) {
-        db()->prepare('INSERT OR IGNORE INTO "Tag" (id, name, createdAt, updatedAt) VALUES (?, ?, ?, ?)')
-            ->execute([uuid(), $name, $timestamp, $timestamp]);
+        $insertTag->execute([uuid(), $name, $timestamp, $timestamp]);
     }
 
     $stmt = db()->prepare('SELECT 1 FROM "Destination" WHERE name = ? AND createdBy = ?');

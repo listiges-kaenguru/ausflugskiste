@@ -159,8 +159,7 @@ function setup(): never
 
 function login(): never
 {
-    $key = 'login:' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
-    if (is_rate_limited($key)) {
+    if (is_rate_limited('login:' . client_ip())) {
         fail(429, 'RATE_LIMITED', 'Zu viele Anmeldeversuche. Bitte später erneut versuchen.');
     }
 
@@ -209,16 +208,21 @@ function login_totp(): never
     respond(['user' => $user, 'recoveryCodesLeft' => $usedRecoveryCode ? recovery_codes_left($pending['userId']) : null]);
 }
 
+/** Höchstens 5 Codes in 5 Minuten je Benutzer, damit sich der sechsstellige Code nicht durchprobieren lässt. */
+function limit_totp_attempts(string $userId): void
+{
+    if (is_rate_limited('totp:' . $userId, 5, 300)) {
+        fail(429, 'RATE_LIMITED', 'Zu viele falsche Codes. Bitte in ein paar Minuten erneut versuchen.');
+    }
+}
+
 /**
  * Prüft einen TOTP- oder Wiederherstellungscode und verbraucht ihn. Liefert true, wenn es ein
- * Wiederherstellungscode war. Höchstens 5 Versuche in 5 Minuten je Benutzer, damit sich der
- * sechsstellige Code nicht durchprobieren lässt.
+ * Wiederherstellungscode war.
  */
 function check_second_factor(array $user, string $code, int $failStatus = 400): bool
 {
-    if (is_rate_limited('totp:' . $user['id'], 5, 300)) {
-        fail(429, 'RATE_LIMITED', 'Zu viele falsche Codes. Bitte in ein paar Minuten erneut versuchen.');
-    }
+    limit_totp_attempts($user['id']);
     $code = trim($code);
     $digits = (string) preg_replace('/\s+/', '', $code);
     $secret = decrypt_secret($user['totpSecret'], $user['id'])
@@ -226,7 +230,7 @@ function check_second_factor(array $user, string $code, int $failStatus = 400): 
     $step = totp_verify($secret, $digits, $user['totpLastStep'] === null ? null : (int) $user['totpLastStep']);
     if ($step !== null) {
         db()->prepare('UPDATE "User" SET totpLastStep = ? WHERE id = ?')->execute([$step, $user['id']]);
-        db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute(['totp:' . $user['id']]);
+        clear_rate_limit('totp:' . $user['id']);
         return false;
     }
 
@@ -235,7 +239,7 @@ function check_second_factor(array $user, string $code, int $failStatus = 400): 
     if ($index !== false) {
         array_splice($hashes, $index, 1);
         db()->prepare('UPDATE "User" SET totpRecoveryCodes = ? WHERE id = ?')->execute([json_encode($hashes), $user['id']]);
-        db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute(['totp:' . $user['id']]);
+        clear_rate_limit('totp:' . $user['id']);
         return true;
     }
     fail($failStatus, 'INVALID_CODE', 'Der Code ist falsch oder abgelaufen');
@@ -245,7 +249,13 @@ function recovery_codes_left(string $userId): int
 {
     $stmt = db()->prepare('SELECT totpRecoveryCodes FROM "User" WHERE id = ?');
     $stmt->execute([$userId]);
-    return count(json_decode((string) $stmt->fetchColumn(), true) ?: []);
+    return count_recovery_codes($stmt->fetchColumn());
+}
+
+/** Anzahl der Hashes in der JSON-Spalte totpRecoveryCodes. */
+function count_recovery_codes(mixed $column): int
+{
+    return count(json_decode((string) $column, true) ?: []);
 }
 
 function session_user_json(array $user): array
@@ -284,6 +294,16 @@ function is_rate_limited(string $key, int $limit = 5, int $windowSeconds = 60): 
     }
     db()->prepare('UPDATE "LoginAttempt" SET count = count + 1 WHERE key = ?')->execute([$key]);
     return false;
+}
+
+function clear_rate_limit(string $key): void
+{
+    db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute([$key]);
+}
+
+function client_ip(): string
+{
+    return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 }
 
 function logout(): never
@@ -341,12 +361,16 @@ function passkey_json(array $row): array
     ];
 }
 
+function user_passkeys(string $userId): array
+{
+    $stmt = db()->prepare('SELECT * FROM "Passkey" WHERE userId = ? ORDER BY createdAt');
+    $stmt->execute([$userId]);
+    return array_map('passkey_json', $stmt->fetchAll());
+}
+
 function list_passkeys(): never
 {
-    $user = require_user();
-    $stmt = db()->prepare('SELECT * FROM "Passkey" WHERE userId = ? ORDER BY createdAt');
-    $stmt->execute([$user['id']]);
-    respond(array_map('passkey_json', $stmt->fetchAll()));
+    respond(user_passkeys(require_user()['id']));
 }
 
 /** Optionen für navigator.credentials.create(), Binärwerte als Base64URL. */
@@ -443,7 +467,7 @@ function passkey_login_options(): never
 function passkey_login(): never
 {
     require_passkeys();
-    if (is_rate_limited('passkey:' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 10)) {
+    if (is_rate_limited('passkey:' . client_ip(), 10)) {
         fail(429, 'RATE_LIMITED', 'Zu viele Anmeldeversuche. Bitte später erneut versuchen.');
     }
     $body = json_body();
@@ -485,7 +509,7 @@ function totp_status(): never
     $user = totp_user();
     respond([
         'enabled' => $user['totpSecret'] !== null,
-        'recoveryCodesLeft' => $user['totpSecret'] === null ? 0 : recovery_codes_left($user['id']),
+        'recoveryCodesLeft' => $user['totpSecret'] === null ? 0 : count_recovery_codes($user['totpRecoveryCodes']),
     ]);
 }
 
@@ -520,9 +544,7 @@ function enable_totp(): never
     if (!is_array($pending) || $pending['expires'] < time()) {
         fail(400, 'TOTP_EXPIRED', 'Die Einrichtung ist abgelaufen. Bitte neu beginnen.');
     }
-    if (is_rate_limited('totp:' . $user['id'], 5, 300)) {
-        fail(429, 'RATE_LIMITED', 'Zu viele falsche Codes. Bitte in ein paar Minuten erneut versuchen.');
-    }
+    limit_totp_attempts($user['id']);
     $step = totp_verify($pending['secret'], (string) preg_replace('/\s+/', '', string_field(json_body(), 'code') ?? ''));
     if ($step === null) {
         fail(400, 'INVALID_CODE', 'Der Code passt nicht. Stimmt die Uhrzeit auf dem Handy?');
@@ -531,7 +553,7 @@ function enable_totp(): never
     $codes = totp_new_recovery_codes();
     db()->prepare('UPDATE "User" SET totpSecret = ?, totpLastStep = ?, totpRecoveryCodes = ?, updatedAt = ? WHERE id = ?')
         ->execute([encrypt_secret($pending['secret'], $user['id']), $step, json_encode(array_map('totp_recovery_hash', $codes)), now(), $user['id']]);
-    db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute(['totp:' . $user['id']]);
+    clear_rate_limit('totp:' . $user['id']);
     unset($_SESSION['totpSetup']);
     respond(['recoveryCodes' => $codes]);
 }
@@ -625,12 +647,15 @@ function create_user(): never
     $body = json_body();
     $role = ($body['role'] ?? 'USER') === 'ADMIN' ? 'ADMIN' : 'USER';
     if (($body['password'] ?? '') === '') {
+        $username = validate_username($body);
         $password = generate_password();
-        $user = insert_user(validate_username($body), $password, $role, true);
-        respond(['password' => $password] + user_json($user + ['disabledAt' => null]), 201);
+        $shown = ['password' => $password];
+    } else {
+        ['username' => $username, 'password' => $password] = validate_credentials($body);
+        $shown = [];
     }
-    $input = validate_credentials($body);
-    respond(user_json(insert_user($input['username'], $input['password'], $role, true) + ['disabledAt' => null]), 201);
+    $user = insert_user($username, $password, $role, true);
+    respond($shown + user_json($user + ['disabledAt' => null]), 201);
 }
 
 /** Lädt einen anderen Benutzer – Admins können sich nicht selbst sperren, löschen oder zurücksetzen. */
@@ -669,9 +694,7 @@ function reset_user_password(string $id): never
 function list_user_passkeys(string $id): never
 {
     other_user($id);
-    $stmt = db()->prepare('SELECT * FROM "Passkey" WHERE userId = ? ORDER BY createdAt');
-    $stmt->execute([$id]);
-    respond(array_map('passkey_json', $stmt->fetchAll()));
+    respond(user_passkeys($id));
 }
 
 function delete_user_passkey(string $id, string $passkeyId): never
@@ -703,7 +726,7 @@ function delete_user(string $id): never
 
     db()->prepare('DELETE FROM "User" WHERE id = ?')->execute([$id]);
     foreach ($files as $filename) {
-        @unlink(image_path(['filename' => $filename]));
+        @unlink(image_path($filename));
     }
     respond(['ok' => true]);
 }
@@ -744,7 +767,7 @@ function load_destinations(array $rows): array
     $stmt->execute($ids);
     foreach ($stmt as $image) {
         $image['filesize'] = (int) $image['filesize'];
-        $image['url'] = 'api.php?r=images/' . rawurlencode($image['id']) . '/file';
+        $image['url'] = image_url($image['id']);
         $images[$image['destinationId']][] = $image;
     }
 
@@ -868,7 +891,8 @@ function set_destination_tags(string $destinationId, array $tagIds): void
 function delete_destination(string $id): never
 {
     own_destination($id);
-    db()->prepare('UPDATE "Destination" SET deletedAt = ?, updatedAt = ? WHERE id = ?')->execute([now(), now(), $id]);
+    $timestamp = now();
+    db()->prepare('UPDATE "Destination" SET deletedAt = ?, updatedAt = ? WHERE id = ?')->execute([$timestamp, $timestamp, $id]);
     respond(['ok' => true]);
 }
 
@@ -896,8 +920,9 @@ function create_tag(): never
     $name = validate_tag(json_body());
     assert_tag_name_free($name);
     $tag = ['id' => uuid(), 'name' => $name];
+    $timestamp = now();
     db()->prepare('INSERT INTO "Tag" (id, name, createdAt, updatedAt) VALUES (?, ?, ?, ?)')
-        ->execute([$tag['id'], $name, now(), now()]);
+        ->execute([$tag['id'], $name, $timestamp, $timestamp]);
     respond($tag, 201);
 }
 
@@ -960,14 +985,14 @@ function upload_image(): never
         'createdAt' => now(),
     ];
     $filename = $image['id'] . '.' . $type[1];
-    if (!move_uploaded_file($file['tmp_name'], data_dir() . '/uploads/' . $filename)) {
+    if (!move_uploaded_file($file['tmp_name'], image_path($filename))) {
         throw new RuntimeException('Bild konnte nicht gespeichert werden');
     }
 
     db()->prepare('INSERT INTO "DestinationImage" (id, destinationId, filename, mimeType, filesize, createdAt) VALUES (?, ?, ?, ?, ?, ?)')
         ->execute([$image['id'], $image['destinationId'], $filename, $image['mimeType'], $image['filesize'], $image['createdAt']]);
 
-    $image['url'] = 'api.php?r=images/' . $image['id'] . '/file';
+    $image['url'] = image_url($image['id']);
     respond($image, 201);
 }
 
@@ -979,27 +1004,33 @@ function own_image(string $id): array
     return $stmt->fetch() ?: fail(404, 'NOT_FOUND', 'Bild nicht gefunden');
 }
 
-function image_path(array $image): string
+function image_path(string $filename): string
 {
-    return data_dir() . '/uploads/' . basename($image['filename']);
+    return data_dir() . '/uploads/' . basename($filename);
+}
+
+function image_url(string $id): string
+{
+    return 'api.php?r=images/' . rawurlencode($id) . '/file';
 }
 
 function send_image(string $id): never
 {
-    $path = image_path(own_image($id));
+    $path = image_path(own_image($id)['filename']);
     if (!is_file($path)) {
         fail(404, 'NOT_FOUND', 'Bild nicht gefunden');
     }
     session_write_close();
     header_remove('Cache-Control');
     header('Cache-Control: private, max-age=86400');
-    header('Content-Type: ' . own_image_mime($path));
+    header('Content-Type: ' . image_mime($path));
     header('Content-Length: ' . filesize($path));
     readfile($path);
     exit;
 }
 
-function own_image_mime(string $path): string
+/** Typ aus dem Dateiinhalt, nicht aus der Datenbank. */
+function image_mime(string $path): string
 {
     $info = @getimagesize($path);
     return $info ? (ALLOWED_IMAGE_TYPES[$info[2]][0] ?? 'application/octet-stream') : 'application/octet-stream';
@@ -1009,6 +1040,6 @@ function delete_image(string $id): never
 {
     $image = own_image($id);
     db()->prepare('DELETE FROM "DestinationImage" WHERE id = ?')->execute([$id]);
-    @unlink(image_path($image));
+    @unlink(image_path($image['filename']));
     respond(['ok' => true]);
 }

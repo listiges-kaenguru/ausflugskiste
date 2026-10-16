@@ -8,6 +8,11 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Geändert
+- Code aufgeräumt, ohne Änderung an Oberfläche, Verhalten oder API: ungenutztes Icon und CSS-Regeln entfernt,
+  doppelte Bausteine zusammengefasst (Kopieren-Button, Passkey-Listeneintrag, Adresszeile, Passwortprüfung,
+  Rate-Limit für 2FA-Codes, Bildpfade, lesbare Zufallscodes) und die Prüfung des Datenverzeichnisses vereinfacht.
+
 ## [0.4.1] – 2026-10-16
 
 ### Sicherheit

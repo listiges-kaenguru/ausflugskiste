@@ -99,8 +99,6 @@ main:focus { outline: none; }
 .icon { width: 1.25rem; height: 1.25rem; flex: none; }
 .icon.sm { width: 1rem; height: 1rem; }
 .icon.lg { width: 1.75rem; height: 1.75rem; }
-.icon.filled { fill: currentColor; }
-.star { color: var(--star); }
 
 /* ---------------------------------------------------------------- Layout */
 
@@ -256,7 +254,6 @@ main:focus { outline: none; }
 
 .row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
 .row > input { flex: 1; min-width: 10rem; }
-.spacer { flex: 1; }
 
 /* Buttons */
 .btn {

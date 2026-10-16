@@ -93,16 +93,7 @@ function totp_uri(string $secret, string $username): string
 /** Wiederherstellungscodes wie „k7mp-x9qr“, gespeichert wird nur ihr Hash. */
 function totp_new_recovery_codes(): array
 {
-    $alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
-    $codes = [];
-    for ($n = 0; $n < TOTP_RECOVERY_CODES; $n++) {
-        $code = '';
-        for ($i = 0; $i < 8; $i++) {
-            $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-        }
-        $codes[] = substr($code, 0, 4) . '-' . substr($code, 4);
-    }
-    return $codes;
+    return array_map(fn () => readable_code(2), range(1, TOTP_RECOVERY_CODES));
 }
 
 /** Leer- und Bindestriche sowie Groß-/Kleinschreibung spielen bei der Eingabe keine Rolle. */
