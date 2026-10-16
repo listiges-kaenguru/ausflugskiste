@@ -8,6 +8,15 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Sicherheit
+- Die Geheimnisse der Zwei-Faktor-Anmeldung werden jetzt verschlüsselt gespeichert (AES-256-GCM, wie in
+  AuslagenFlow). Der Schlüssel liegt in der neuen Datei `data/secret.key` statt in der Datenbank und wird beim
+  ersten Bedarf erzeugt; die Benutzer-ID ist mitgebunden, ein Geheimnis lässt sich nicht in ein anderes Konto
+  kopieren. Bestehende Geheimnisse aus 0.4.0 werden beim ersten Aufruf automatisch verschlüsselt, eingerichtete
+  Authenticator-Apps funktionieren weiter. Die Zwei-Faktor-Anmeldung braucht dafür die PHP-Erweiterung
+  `openssl` (wie Passkeys); `me` liefert dazu `totp`. Passt der Schlüssel nicht mehr, meldet die Anmeldung das
+  verständlich (`TOTP_KEY_ERROR`) statt „Code falsch“.
+
 ## [0.4.0] – 2026-10-16
 
 ### Hinzugefügt

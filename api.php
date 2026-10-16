@@ -136,6 +136,7 @@ function me(): never
         'user' => current_user(),
         'needsSetup' => needs_setup(),
         'passkeys' => passkeys_available(),
+        'totp' => encryption_available(),
         'version' => APP_VERSION,
         'sourceUrl' => SOURCE_URL,
     ]);
@@ -220,7 +221,9 @@ function check_second_factor(array $user, string $code, int $failStatus = 400): 
     }
     $code = trim($code);
     $digits = (string) preg_replace('/\s+/', '', $code);
-    $step = totp_verify($user['totpSecret'], $digits, $user['totpLastStep'] === null ? null : (int) $user['totpLastStep']);
+    $secret = decrypt_secret($user['totpSecret'], $user['id'])
+        ?? fail(500, 'TOTP_KEY_ERROR', 'Der Code kann nicht geprüft werden, weil der Schlüssel auf dem Server nicht passt. Melde dich mit Passkey an oder bitte einen Administrator, die Zwei-Faktor-Anmeldung zurückzusetzen.');
+    $step = totp_verify($secret, $digits, $user['totpLastStep'] === null ? null : (int) $user['totpLastStep']);
     if ($step !== null) {
         db()->prepare('UPDATE "User" SET totpLastStep = ? WHERE id = ?')->execute([$step, $user['id']]);
         db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute(['totp:' . $user['id']]);
@@ -486,9 +489,17 @@ function totp_status(): never
     ]);
 }
 
+function require_encryption(): void
+{
+    if (!encryption_available()) {
+        fail(501, 'NOT_AVAILABLE', 'Die Zwei-Faktor-Anmeldung ist auf diesem Server nicht verfügbar (PHP-Erweiterung openssl fehlt)');
+    }
+}
+
 /** Erzeugt ein neues Geheimnis; aktiv wird es erst, wenn ein passender Code bestätigt wurde. */
 function totp_setup(): never
 {
+    require_encryption();
     $user = totp_user();
     if ($user['totpSecret'] !== null) {
         fail(409, 'CONFLICT', 'Die Zwei-Faktor-Anmeldung ist bereits eingerichtet');
@@ -500,6 +511,7 @@ function totp_setup(): never
 
 function enable_totp(): never
 {
+    require_encryption();
     $user = totp_user();
     $pending = $_SESSION['totpSetup'] ?? null;
     if ($user['totpSecret'] !== null) {
@@ -518,7 +530,7 @@ function enable_totp(): never
 
     $codes = totp_new_recovery_codes();
     db()->prepare('UPDATE "User" SET totpSecret = ?, totpLastStep = ?, totpRecoveryCodes = ?, updatedAt = ? WHERE id = ?')
-        ->execute([$pending['secret'], $step, json_encode(array_map('totp_recovery_hash', $codes)), now(), $user['id']]);
+        ->execute([encrypt_secret($pending['secret'], $user['id']), $step, json_encode(array_map('totp_recovery_hash', $codes)), now(), $user['id']]);
     db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute(['totp:' . $user['id']]);
     unset($_SESSION['totpSetup']);
     respond(['recoveryCodes' => $codes]);
