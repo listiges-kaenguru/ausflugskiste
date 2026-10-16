@@ -12,6 +12,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 - Code aufgeräumt, ohne Änderung an Oberfläche, Verhalten oder API: ungenutztes Icon und CSS-Regeln entfernt,
   doppelte Bausteine zusammengefasst (Kopieren-Button, Passkey-Listeneintrag, Adresszeile, Passwortprüfung,
   Rate-Limit für 2FA-Codes, Bildpfade, lesbare Zufallscodes) und die Prüfung des Datenverzeichnisses vereinfacht.
+- Hinweise für Coding-Agents stehen jetzt in `CLAUDE.md` (statt `AGENTS.md`), `IDEEN.md` ist in ToDo und Ideen gegliedert.
 
 ## [0.4.1] – 2026-10-16
 
