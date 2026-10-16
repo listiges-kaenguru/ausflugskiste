@@ -578,6 +578,9 @@ function totpSection(status) {
           h("span", { class: "muted small" }, "Bei der Anmeldung mit Passwort zusätzlich ein Code aus einer Authenticator-App. Mit Passkey nicht nötig – der ist schon zwei Faktoren in einem."),
         ),
       ),
+      !status.enabled && !session.totp
+        ? h("p", { class: "hint" }, "Die Zwei-Faktor-Anmeldung ist auf diesem Server nicht verfügbar (PHP-Erweiterung openssl fehlt).")
+        : null,
       status.enabled
         ? h(
             "p",
@@ -595,7 +598,7 @@ function totpSection(status) {
               h("button", { type: "button", class: "btn secondary small", onclick: renewCodes }, "Neue Wiederherstellungscodes"),
               h("button", { type: "button", class: "btn danger small", onclick: disable }, "Abschalten"),
             ]
-          : h("button", { type: "button", class: "btn secondary", onclick: enable }, icon("smartphone", "sm"), "Einrichten"),
+          : session.totp ? h("button", { type: "button", class: "btn secondary", onclick: enable }, icon("smartphone", "sm"), "Einrichten") : null,
       ),
     );
   }
@@ -2282,7 +2285,7 @@ function changePasswordPage() {
 
 // ---------------------------------------------------------------- Router
 
-const session = { user: null, needsSetup: false, passkeys: false, version: null, sourceUrl: null, loaded: false };
+const session = { user: null, needsSetup: false, passkeys: false, totp: false, version: null, sourceUrl: null, loaded: false };
 
 const routes = [
   [/^\/$/, "dashboard", () => dashboardPage()],

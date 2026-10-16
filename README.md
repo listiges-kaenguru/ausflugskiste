@@ -18,7 +18,7 @@ das Frontend ist reines HTML/CSS/JavaScript, das Backend reines PHP mit SQLite.
 ## Voraussetzungen
 - Webserver mit PHP **8.1 oder neuer** (z. B. Apache, nginx + PHP-FPM, oder gewöhnliches Webhosting)
 - PHP-Erweiterung `pdo_sqlite` (bei fast allen Hostern standardmäßig aktiv)
-- Optional: PHP-Erweiterung `openssl` für die Anmeldung mit Passkeys (ebenfalls fast überall aktiv)
+- Optional: PHP-Erweiterung `openssl` für Passkeys und die Zwei-Faktor-Anmeldung (ebenfalls fast überall aktiv)
 - Schreibrechte für PHP im Ordner `data/`
 
 ## Installation
@@ -61,6 +61,12 @@ Besitz (Gerät) und Fingerabdruck bzw. PIN bereits in sich.
   einmal statt des App-Codes funktionieren. Neue Codes gibt es jederzeit im Profil (die alten werden ungültig).
 - Die Uhr des Servers muss stimmen (Abweichung höchstens etwa 30 Sekunden), sonst passen die Codes nicht.
 - Höchstens 5 falsche Codes in 5 Minuten je Benutzer, jeder Code gilt nur einmal.
+- Die Geheimnisse der Authenticator-Apps liegen **verschlüsselt** in der Datenbank (AES-256-GCM). Der Schlüssel
+  steht in einer eigenen Datei `data/secret.key`, nicht in der Datenbank; die App legt sie beim ersten Einrichten
+  selbst an. Wer nur `app.db` in die Hände bekommt, kann damit keine Codes erzeugen. Geht `secret.key` verloren
+  oder wird ersetzt, lassen sich die Codes nicht mehr prüfen: Betroffene melden sich per Passkey an, oder ein Admin
+  schaltet ihre Zwei-Faktor-Anmeldung ab (`disable-totp`), danach richten sie sie neu ein.
+- Ohne die PHP-Erweiterung `openssl` ist die Zwei-Faktor-Anmeldung nicht verfügbar.
 - Ist das Handy weg und sind keine Wiederherstellungscodes zur Hand, schaltet ein Admin die
   Zwei-Faktor-Anmeldung unter **Profil → Benutzer** ab – oder auf der Kommandozeile mit `disable-totp`.
 
@@ -137,6 +143,7 @@ php server/cli.php disable-totp <name>                      # Zwei-Faktor-Anmeld
 Alle Daten liegen in `data/`:
 - `data/app.db` – SQLite-Datenbank
 - `data/uploads/` – hochgeladene Bilder
+- `data/secret.key` – Schlüssel für die Zwei-Faktor-Anmeldung (nur vorhanden, sobald jemand sie eingerichtet hat)
 
 Für ein Backup genügt es, diesen Ordner zu kopieren (am besten, während niemand die App benutzt).
 Zum Wiederherstellen den Ordner zurückkopieren.

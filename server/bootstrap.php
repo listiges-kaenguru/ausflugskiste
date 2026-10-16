@@ -164,6 +164,84 @@ function migrate(PDO $pdo): void
             $pdo->exec("ALTER TABLE \"User\" ADD COLUMN \"$column\" $type");
         }
     }
+    // Version 0.4.0 speicherte die 2FA-Geheimnisse im Klartext: jetzt verschlüsseln.
+    if (encryption_available()) {
+        $plain = $pdo->query("SELECT id, totpSecret FROM \"User\" WHERE totpSecret IS NOT NULL AND totpSecret NOT LIKE 'v1:%'")->fetchAll();
+        $update = $pdo->prepare('UPDATE "User" SET totpSecret = ? WHERE id = ?');
+        foreach ($plain as $row) {
+            $update->execute([encrypt_secret($row['totpSecret'], $row['id']), $row['id']]);
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Verschlüsselung der 2FA-Geheimnisse
+// AES-256-GCM mit einem eigenen Schlüssel in data/secret.key, nicht in der Datenbank: Wer nur app.db in die Hände
+// bekommt (Backup, Kopie, SQL-Lücke), kann damit keine Einmalcodes erzeugen. Die Benutzer-ID ist als Zusatzdaten
+// gebunden, ein Geheimnis lässt sich also nicht in ein anderes Konto kopieren.
+
+const SECRET_PREFIX = 'v1:';
+
+function encryption_available(): bool
+{
+    return function_exists('openssl_encrypt') && in_array('aes-256-gcm', openssl_get_cipher_methods(), true);
+}
+
+function secret_key_path(): string
+{
+    return data_dir() . '/secret.key';
+}
+
+/** Liest den Schlüssel; beim ersten Bedarf wird er erzeugt (nur Lese- und Schreibrecht für PHP). */
+function secret_key(): string
+{
+    static $key = null;
+    if ($key !== null) {
+        return $key;
+    }
+    $path = secret_key_path();
+    if (!is_file($path)) {
+        $handle = @fopen($path, 'x');
+        if ($handle !== false) {
+            fwrite($handle, base64_encode(random_bytes(32)) . "\n");
+            fclose($handle);
+            @chmod($path, 0600);
+        }
+    }
+    $decoded = base64_decode(trim((string) @file_get_contents($path)), true);
+    if ($decoded === false || strlen($decoded) !== 32) {
+        error_log("Ausflugskiste: Schlüsseldatei $path fehlt oder ist ungültig");
+        throw new ApiException(500, 'SETUP_ERROR', 'Die Schlüsseldatei data/secret.key ist nicht lesbar oder beschädigt (siehe README, Abschnitt Zwei-Faktor-Anmeldung).');
+    }
+    return $key = $decoded;
+}
+
+function encrypt_secret(string $plain, string $userId): string
+{
+    $iv = random_bytes(12);
+    $tag = '';
+    $cipher = openssl_encrypt($plain, 'aes-256-gcm', secret_key(), OPENSSL_RAW_DATA, $iv, $tag, $userId);
+    if ($cipher === false) {
+        throw new RuntimeException('Verschlüsselung fehlgeschlagen');
+    }
+    return SECRET_PREFIX . base64_encode($iv . $tag . $cipher);
+}
+
+/** Liefert null, wenn sich das Geheimnis nicht entschlüsseln lässt (z. B. Schlüsseldatei ersetzt). */
+function decrypt_secret(string $stored, string $userId): ?string
+{
+    // Geheimnisse aus Version 0.4.0 stehen noch im Klartext (Base32), bis migrate() sie verschlüsselt.
+    if (!str_starts_with($stored, SECRET_PREFIX)) {
+        return $stored;
+    }
+    if (!encryption_available()) {
+        return null;
+    }
+    $raw = base64_decode(substr($stored, strlen(SECRET_PREFIX)), true);
+    if ($raw === false || strlen($raw) < 29) {
+        return null;
+    }
+    $plain = openssl_decrypt(substr($raw, 28), 'aes-256-gcm', secret_key(), OPENSSL_RAW_DATA, substr($raw, 0, 12), substr($raw, 12, 16), $userId);
+    return $plain === false ? null : $plain;
 }
 
 function uuid(): string
