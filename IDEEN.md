@@ -1,8 +1,9 @@
-# Ideen & Backlog
+# Ideen & ToDo
 
-Gesammelte Ideen für spätere Versionen – noch nicht umgesetzt. Erledigte Punkte wandern ins [CHANGELOG](CHANGELOG.md).
+Offene Punkte und Ideen für spätere Versionen. Erledigtes wird hier gestrichen und ins
+[CHANGELOG](CHANGELOG.md) übernommen.
 
-## Geplant
+## ToDo
 
 ### Feature: Kategorien
 Eigene Kategorien anlegen (z. B. „Wandern“, „Museum“, „Mit Kindern“) und Ziele zuordnen.
@@ -18,7 +19,7 @@ Ziele (einzeln oder eine ganze Kategorie) mit anderen Benutzern teilen.
 - Persönliche Felder (`privateNotes`, ggf. Favorit/Besucht) pro Benutzer trennen – sonst sieht/ändert der andere sie mit.
 - UI: Freigabe-Dialog auf der Detailseite, Kennzeichnung „geteilt von …“ im Dashboard, Liste „Mit mir geteilt“.
 
-## Weitere Ideen
+## Ideen
 
 - **Kartenansicht**: `latitude`/`longitude` existieren im Schema, werden aber nicht genutzt. Koordinaten erfassen (Browser-Geolocation „Aktueller Standort“) und Ziele auf einer Karte zeigen – ohne externe Bibliothek z. B. als Link zu OpenStreetMap; eine eingebettete Karte bräuchte eine Bibliothek (Abwägung wegen „keine Abhängigkeiten“).
 - **Papierkorb**: Ziele werden per `deletedAt` nur weich gelöscht – Ansicht zum Wiederherstellen bzw. endgültigen Löschen.
