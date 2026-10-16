@@ -8,6 +8,8 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+## [0.5.0] – 2026-10-17
+
 ### Hinzugefügt
 - **Versionsprüfung:** Ganz unten im Profil steht jetzt, ob auf GitHub eine neuere Version erschienen ist
   (für Admins mit Link zum Release), sonst „Das ist die neueste Version.“ Die Abfrage stellt der Server
