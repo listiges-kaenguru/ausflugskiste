@@ -70,7 +70,7 @@ function db(): PDO
 }
 
 // Entspricht dem bisherigen Prisma-Schema, damit bestehende Datenbanken weiter funktionieren.
-// Neue Tabellen (z. B. Passkey) kommen nur additiv hinzu.
+// Neue Tabellen (z. B. Passkey) und Spalten kommen nur additiv hinzu.
 function migrate(PDO $pdo): void
 {
     $pdo->exec(<<<'SQL'
@@ -157,6 +157,12 @@ function migrate(PDO $pdo): void
     }
     if (!in_array('mustChangePassword', $userColumns, true)) {
         $pdo->exec('ALTER TABLE "User" ADD COLUMN "mustChangePassword" BOOLEAN NOT NULL DEFAULT false');
+    }
+    // Zwei-Faktor-Anmeldung: Geheimnis (Base32), zuletzt verbrauchtes Zeitfenster, Hashes der Wiederherstellungscodes (JSON).
+    foreach (['totpSecret' => 'TEXT', 'totpLastStep' => 'INTEGER', 'totpRecoveryCodes' => 'TEXT'] as $column => $type) {
+        if (!in_array($column, $userColumns, true)) {
+            $pdo->exec("ALTER TABLE \"User\" ADD COLUMN \"$column\" $type");
+        }
     }
 }
 

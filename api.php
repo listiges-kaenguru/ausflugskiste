@@ -10,6 +10,7 @@ ini_set('log_errors', '1');
 require __DIR__ . '/server/bootstrap.php';
 require __DIR__ . '/server/validation.php';
 require __DIR__ . '/server/webauthn.php';
+require __DIR__ . '/server/totp.php';
 
 security_headers();
 
@@ -31,9 +32,16 @@ try {
     match (true) {
         $resource === 'me' && $method === 'GET' => me(),
         $resource === 'setup' && $method === 'POST' => setup(),
-        $resource === 'login' && $method === 'POST' => login(),
+        $resource === 'login' && $id === null && $method === 'POST' => login(),
+        $resource === 'login' && $id === 'totp' && $method === 'POST' => login_totp(),
         $resource === 'logout' && $method === 'POST' => logout(),
         $resource === 'change-password' && $method === 'POST' => change_password(),
+
+        $resource === 'totp' && $id === null && $method === 'GET' => totp_status(),
+        $resource === 'totp' && $id === 'setup' && $method === 'POST' => totp_setup(),
+        $resource === 'totp' && $id === null && $method === 'POST' => enable_totp(),
+        $resource === 'totp' && $id === 'recovery-codes' && $method === 'POST' => renew_recovery_codes(),
+        $resource === 'totp' && $id === null && $method === 'DELETE' => disable_totp(),
 
         $resource === 'passkey-login' && $id === 'options' && $method === 'POST' => passkey_login_options(),
         $resource === 'passkey-login' && $id === null && $method === 'POST' => passkey_login(),
@@ -65,6 +73,7 @@ try {
         $resource === 'users' && $id !== null && $action === 'password' && $method === 'POST' => reset_user_password($id),
         $resource === 'users' && $id !== null && $action === 'passkeys' && $subId === null && $method === 'GET' => list_user_passkeys($id),
         $resource === 'users' && $id !== null && $action === 'passkeys' && $subId !== null && $method === 'DELETE' => delete_user_passkey($id, $subId),
+        $resource === 'users' && $id !== null && $action === 'totp' && $method === 'DELETE' => reset_user_totp($id),
 
         default => fail(404, 'NOT_FOUND', 'Unbekannter Endpunkt'),
     };
@@ -84,10 +93,10 @@ function current_user(): ?array
         return null;
     }
     // Gesperrte Benutzer gelten als abgemeldet – bestehende Sessions enden damit sofort.
-    $stmt = db()->prepare('SELECT id, username, role, createdAt, mustChangePassword FROM "User" WHERE id = ? AND disabledAt IS NULL');
+    $stmt = db()->prepare('SELECT id, username, role, createdAt, mustChangePassword, totpSecret IS NOT NULL AS totpEnabled FROM "User" WHERE id = ? AND disabledAt IS NULL');
     $stmt->execute([$userId]);
     $user = $stmt->fetch();
-    return $user ? ['mustChangePassword' => (bool) $user['mustChangePassword']] + $user : null;
+    return $user ? ['mustChangePassword' => (bool) $user['mustChangePassword'], 'totpEnabled' => (bool) $user['totpEnabled']] + $user : null;
 }
 
 /** Solange ein vom Admin vergebenes Passwort nicht geändert wurde, ist nur der Passwortwechsel erlaubt. */
@@ -117,6 +126,7 @@ function needs_setup(): bool
 function sign_in(array $user): void
 {
     session_regenerate_id(true);
+    unset($_SESSION['totpLogin']);
     $_SESSION['userId'] = $user['id'];
 }
 
@@ -163,8 +173,76 @@ function login(): never
     }
     assert_not_disabled($user);
 
+    // Mit Zwei-Faktor-Anmeldung gilt das Passwort erst zusammen mit dem Code aus der App.
+    if ($user['totpSecret'] !== null) {
+        session_regenerate_id(true);
+        unset($_SESSION['userId']);
+        $_SESSION['totpLogin'] = ['userId' => $user['id'], 'expires' => time() + TOTP_LOGIN_TIMEOUT];
+        respond(['totpRequired' => true]);
+    }
+
     sign_in($user);
     respond(['user' => session_user_json($user)]);
+}
+
+/** Zweiter Schritt der Anmeldung: Code aus der Authenticator-App oder ein Wiederherstellungscode. */
+function login_totp(): never
+{
+    $pending = $_SESSION['totpLogin'] ?? null;
+    if (!is_array($pending) || $pending['expires'] < time()) {
+        unset($_SESSION['totpLogin']);
+        fail(401, 'TOTP_EXPIRED', 'Die Anmeldung hat zu lange gedauert. Bitte erneut mit Passwort anmelden.');
+    }
+    $stmt = db()->prepare('SELECT * FROM "User" WHERE id = ?');
+    $stmt->execute([$pending['userId']]);
+    $user = $stmt->fetch();
+    if (!$user || $user['totpSecret'] === null) {
+        unset($_SESSION['totpLogin']);
+        fail(401, 'TOTP_EXPIRED', 'Bitte erneut mit Passwort anmelden.');
+    }
+    assert_not_disabled($user);
+
+    $usedRecoveryCode = check_second_factor($user, string_field(json_body(), 'code') ?? '', 401);
+    $user = session_user_json($user);
+    sign_in($user);
+    respond(['user' => $user, 'recoveryCodesLeft' => $usedRecoveryCode ? recovery_codes_left($pending['userId']) : null]);
+}
+
+/**
+ * Prüft einen TOTP- oder Wiederherstellungscode und verbraucht ihn. Liefert true, wenn es ein
+ * Wiederherstellungscode war. Höchstens 5 Versuche in 5 Minuten je Benutzer, damit sich der
+ * sechsstellige Code nicht durchprobieren lässt.
+ */
+function check_second_factor(array $user, string $code, int $failStatus = 400): bool
+{
+    if (is_rate_limited('totp:' . $user['id'], 5, 300)) {
+        fail(429, 'RATE_LIMITED', 'Zu viele falsche Codes. Bitte in ein paar Minuten erneut versuchen.');
+    }
+    $code = trim($code);
+    $digits = (string) preg_replace('/\s+/', '', $code);
+    $step = totp_verify($user['totpSecret'], $digits, $user['totpLastStep'] === null ? null : (int) $user['totpLastStep']);
+    if ($step !== null) {
+        db()->prepare('UPDATE "User" SET totpLastStep = ? WHERE id = ?')->execute([$step, $user['id']]);
+        db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute(['totp:' . $user['id']]);
+        return false;
+    }
+
+    $hashes = json_decode((string) $user['totpRecoveryCodes'], true) ?: [];
+    $index = $code === '' ? false : array_search(totp_recovery_hash($code), $hashes, true);
+    if ($index !== false) {
+        array_splice($hashes, $index, 1);
+        db()->prepare('UPDATE "User" SET totpRecoveryCodes = ? WHERE id = ?')->execute([json_encode($hashes), $user['id']]);
+        db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute(['totp:' . $user['id']]);
+        return true;
+    }
+    fail($failStatus, 'INVALID_CODE', 'Der Code ist falsch oder abgelaufen');
+}
+
+function recovery_codes_left(string $userId): int
+{
+    $stmt = db()->prepare('SELECT totpRecoveryCodes FROM "User" WHERE id = ?');
+    $stmt->execute([$userId]);
+    return count(json_decode((string) $stmt->fetchColumn(), true) ?: []);
 }
 
 function session_user_json(array $user): array
@@ -174,6 +252,7 @@ function session_user_json(array $user): array
         'username' => $user['username'],
         'role' => $user['role'],
         'mustChangePassword' => (bool) $user['mustChangePassword'],
+        'totpEnabled' => ($user['totpSecret'] ?? null) !== null,
     ];
 }
 
@@ -365,7 +444,7 @@ function passkey_login(): never
         fail(429, 'RATE_LIMITED', 'Zu viele Anmeldeversuche. Bitte später erneut versuchen.');
     }
     $body = json_body();
-    $stmt = db()->prepare('SELECT p.*, u.username, u.role, u.disabledAt, u.mustChangePassword FROM "Passkey" p JOIN "User" u ON u.id = p.userId WHERE p.credentialId = ?');
+    $stmt = db()->prepare('SELECT p.*, u.username, u.role, u.disabledAt, u.mustChangePassword, u.totpSecret FROM "Passkey" p JOIN "User" u ON u.id = p.userId WHERE p.credentialId = ?');
     $stmt->execute([(string) ($body['id'] ?? '')]);
     $passkey = $stmt->fetch();
     if (!$passkey) {
@@ -385,6 +464,95 @@ function passkey_login(): never
     $user = session_user_json(['id' => $passkey['userId']] + $passkey);
     sign_in($user);
     respond(['user' => $user]);
+}
+
+// ---------------------------------------------------------------- Zwei-Faktor-Anmeldung (TOTP)
+
+/** Eigener Benutzer samt TOTP-Spalten. */
+function totp_user(): array
+{
+    $user = require_user();
+    $stmt = db()->prepare('SELECT id, username, totpSecret, totpLastStep, totpRecoveryCodes FROM "User" WHERE id = ?');
+    $stmt->execute([$user['id']]);
+    return $stmt->fetch();
+}
+
+function totp_status(): never
+{
+    $user = totp_user();
+    respond([
+        'enabled' => $user['totpSecret'] !== null,
+        'recoveryCodesLeft' => $user['totpSecret'] === null ? 0 : recovery_codes_left($user['id']),
+    ]);
+}
+
+/** Erzeugt ein neues Geheimnis; aktiv wird es erst, wenn ein passender Code bestätigt wurde. */
+function totp_setup(): never
+{
+    $user = totp_user();
+    if ($user['totpSecret'] !== null) {
+        fail(409, 'CONFLICT', 'Die Zwei-Faktor-Anmeldung ist bereits eingerichtet');
+    }
+    $secret = totp_generate_secret();
+    $_SESSION['totpSetup'] = ['secret' => $secret, 'expires' => time() + 900];
+    respond(['secret' => $secret, 'uri' => totp_uri($secret, $user['username'])]);
+}
+
+function enable_totp(): never
+{
+    $user = totp_user();
+    $pending = $_SESSION['totpSetup'] ?? null;
+    if ($user['totpSecret'] !== null) {
+        fail(409, 'CONFLICT', 'Die Zwei-Faktor-Anmeldung ist bereits eingerichtet');
+    }
+    if (!is_array($pending) || $pending['expires'] < time()) {
+        fail(400, 'TOTP_EXPIRED', 'Die Einrichtung ist abgelaufen. Bitte neu beginnen.');
+    }
+    if (is_rate_limited('totp:' . $user['id'], 5, 300)) {
+        fail(429, 'RATE_LIMITED', 'Zu viele falsche Codes. Bitte in ein paar Minuten erneut versuchen.');
+    }
+    $step = totp_verify($pending['secret'], (string) preg_replace('/\s+/', '', string_field(json_body(), 'code') ?? ''));
+    if ($step === null) {
+        fail(400, 'INVALID_CODE', 'Der Code passt nicht. Stimmt die Uhrzeit auf dem Handy?');
+    }
+
+    $codes = totp_new_recovery_codes();
+    db()->prepare('UPDATE "User" SET totpSecret = ?, totpLastStep = ?, totpRecoveryCodes = ?, updatedAt = ? WHERE id = ?')
+        ->execute([$pending['secret'], $step, json_encode(array_map('totp_recovery_hash', $codes)), now(), $user['id']]);
+    db()->prepare('DELETE FROM "LoginAttempt" WHERE key = ?')->execute(['totp:' . $user['id']]);
+    unset($_SESSION['totpSetup']);
+    respond(['recoveryCodes' => $codes]);
+}
+
+/** Ersetzt alle Wiederherstellungscodes, z. B. wenn sie aufgebraucht oder verloren sind. */
+function renew_recovery_codes(): never
+{
+    $user = totp_user();
+    if ($user['totpSecret'] === null) {
+        fail(400, 'VALIDATION_ERROR', 'Die Zwei-Faktor-Anmeldung ist nicht eingerichtet');
+    }
+    check_second_factor($user, string_field(json_body(), 'code') ?? '');
+    $codes = totp_new_recovery_codes();
+    db()->prepare('UPDATE "User" SET totpRecoveryCodes = ? WHERE id = ?')
+        ->execute([json_encode(array_map('totp_recovery_hash', $codes)), $user['id']]);
+    respond(['recoveryCodes' => $codes]);
+}
+
+function disable_totp(): never
+{
+    $user = totp_user();
+    if ($user['totpSecret'] === null) {
+        respond(['ok' => true]);
+    }
+    check_second_factor($user, string_field(json_body(), 'code') ?? '');
+    clear_totp($user['id']);
+    respond(['ok' => true]);
+}
+
+function clear_totp(string $userId): void
+{
+    db()->prepare('UPDATE "User" SET totpSecret = NULL, totpLastStep = NULL, totpRecoveryCodes = NULL, updatedAt = ? WHERE id = ?')
+        ->execute([now(), $userId]);
 }
 
 // ---------------------------------------------------------------- Benutzer
@@ -415,13 +583,14 @@ function user_json(array $row): array
         'mustChangePassword' => (bool) $row['mustChangePassword'],
         'destinationCount' => (int) ($row['destinationCount'] ?? 0),
         'passkeyCount' => (int) ($row['passkeyCount'] ?? 0),
+        'totpEnabled' => (bool) ($row['totpEnabled'] ?? false),
     ];
 }
 
 function user_query(string $where = ''): string
 {
     return <<<SQL
-        SELECT u.id, u.username, u.role, u.createdAt, u.disabledAt, u.mustChangePassword,
+        SELECT u.id, u.username, u.role, u.createdAt, u.disabledAt, u.mustChangePassword, u.totpSecret IS NOT NULL AS totpEnabled,
             (SELECT COUNT(*) FROM "Destination" d WHERE d.createdBy = u.id AND d.deletedAt IS NULL) AS destinationCount,
             (SELECT COUNT(*) FROM "Passkey" p WHERE p.userId = u.id) AS passkeyCount
         FROM "User" u $where
@@ -501,6 +670,14 @@ function delete_user_passkey(string $id, string $passkeyId): never
     if ($stmt->rowCount() === 0) {
         fail(404, 'NOT_FOUND', 'Passkey nicht gefunden');
     }
+    respond(['ok' => true]);
+}
+
+/** Schaltet die Zwei-Faktor-Anmeldung eines anderen Benutzers ab, z. B. nach einem verlorenen Handy. */
+function reset_user_totp(string $id): never
+{
+    other_user($id);
+    clear_totp($id);
     respond(['ok' => true]);
 }
 

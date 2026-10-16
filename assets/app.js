@@ -58,6 +58,8 @@ const ICONS = {
   tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
   calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
   note: '<path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/><path d="M15 3v4a2 2 0 0 0 2 2h4"/>',
+  smartphone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
   alert: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
 };
 
@@ -475,6 +477,422 @@ function passkeyBanner() {
     banner.remove();
   }
   return banner;
+}
+
+// ---------------------------------------------------------------- Zwei-Faktor-Anmeldung (TOTP)
+
+/** Eingabefeld für den sechsstelligen Code; Handys schlagen ihn per Autofill aus SMS/App vor. */
+function totpInput(props = {}) {
+  return h("input", { type: "text", name: "code", inputmode: "numeric", autocomplete: "one-time-code", autocapitalize: "none", spellcheck: "false", maxlength: "20", required: true, class: "code-input", ...props });
+}
+
+async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    button.replaceChildren(icon("tick", "sm"), "Kopiert");
+  } catch {
+    toast("Kopieren nicht möglich – bitte markieren und manuell kopieren", "error");
+  }
+}
+
+/** Zeigt neue Wiederherstellungscodes einmalig an, zum Kopieren oder Herunterladen. */
+function recoveryCodesDialog(codes) {
+  const text = `Ausflugskiste – Wiederherstellungscodes für ${session.user.username}\nJeder Code funktioniert genau einmal.\n\n${codes.join("\n")}\n`;
+  const copyButton = h("button", { type: "button", class: "btn secondary small", onclick: () => copyText(text, copyButton) }, icon("copy", "sm"), "Kopieren");
+  const downloadButton = h("button", {
+    type: "button",
+    class: "btn secondary small",
+    onclick: () => {
+      const link = h("a", { href: URL.createObjectURL(new Blob([text], { type: "text/plain" })), download: "ausflugskiste-wiederherstellungscodes.txt" });
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    },
+  }, icon("download", "sm"), "Herunterladen");
+  return dialog({
+    title: "Wiederherstellungscodes",
+    text: "Falls du keinen Zugriff auf deine Authenticator-App hast, meldest du dich mit einem dieser Codes an – jeder funktioniert genau einmal. Bewahre sie sicher auf, z. B. im Passwortmanager oder ausgedruckt. Sie werden nur jetzt angezeigt.",
+    content: [h("ol", { class: "code-list" }, codes.map((code) => h("li", null, code))), h("div", { class: "row" }, copyButton, downloadButton)],
+    confirmLabel: "Ich habe sie gesichert",
+    cancelLabel: null,
+  });
+}
+
+/** Einrichtung: QR-Code scannen (oder Schlüssel abtippen), dann einen Code zur Bestätigung eingeben. */
+async function setupTotp() {
+  const { secret, uri } = await api("totp/setup", { method: "POST" });
+  const grouped = secret.match(/.{1,4}/g).join(" ");
+  const copyButton = h("button", { type: "button", class: "btn secondary small", onclick: () => copyText(secret, copyButton) }, icon("copy", "sm"), "Kopieren");
+  const result = await dialog({
+    title: "Zwei-Faktor-Anmeldung einrichten",
+    content: [
+      h("p", { class: "muted" }, "1. Scanne den QR-Code mit einer Authenticator-App, z. B. Aegis, 2FAS, Google oder Microsoft Authenticator – oder mit deinem Passwortmanager."),
+      h("div", { class: "qr-box" }, qrCode(uri, "QR-Code für die Authenticator-App")),
+      h(
+        "details",
+        { class: "disclosure" },
+        h("summary", null, "QR-Code lässt sich nicht scannen?", icon("down", "sm")),
+        h(
+          "div",
+          { class: "totp-manual" },
+          h("a", { href: uri, class: "btn secondary small" }, icon("smartphone", "sm"), "In App auf diesem Gerät öffnen"),
+          h("span", { class: "muted small" }, "Oder diesen Schlüssel in der App eingeben (zeitbasiert, 6 Stellen):"),
+          h("code", { class: "totp-secret", "aria-label": "Geheimer Schlüssel" }, grouped),
+          copyButton,
+        ),
+      ),
+      field("2. Code aus der App eingeben", totpInput({ placeholder: "123 456" })),
+    ],
+    confirmLabel: "Aktivieren",
+    onConfirm: (data) => api("totp", { method: "POST", body: { code: data.get("code") } }),
+  });
+  if (!result) return false;
+  await recoveryCodesDialog(result.recoveryCodes);
+  return true;
+}
+
+/** Fragt einen aktuellen Code (oder Wiederherstellungscode) ab, bevor etwas an der 2FA geändert wird. */
+function totpCodeDialog({ title, text, confirmLabel, danger, action }) {
+  return dialog({
+    title,
+    text,
+    content: field("Code aus der App", totpInput({ autofocus: true }), { hint: "Oder einen Wiederherstellungscode." }),
+    confirmLabel,
+    danger,
+    onConfirm: (data) => action(String(data.get("code"))),
+  });
+}
+
+function totpSection(status) {
+  const container = h("div", { class: "field" });
+
+  function render() {
+    const low = status.enabled && status.recoveryCodesLeft <= 3;
+    container.replaceChildren(
+      h(
+        "div",
+        { class: "card-header" },
+        h(
+          "div",
+          null,
+          h("strong", null, "Zwei-Faktor-Anmeldung", status.enabled ? h("span", { class: "badge-role admin" }, "Aktiv") : null),
+          h("span", { class: "muted small" }, "Bei der Anmeldung mit Passwort zusätzlich ein Code aus einer Authenticator-App. Mit Passkey nicht nötig – der ist schon zwei Faktoren in einem."),
+        ),
+      ),
+      status.enabled
+        ? h(
+            "p",
+            { class: low ? "error" : "muted small" },
+            status.recoveryCodesLeft === 0
+              ? "Keine Wiederherstellungscodes mehr übrig – erzeuge neue."
+              : `Noch ${plural(status.recoveryCodesLeft, "Wiederherstellungscode", "Wiederherstellungscodes")} übrig.`,
+          )
+        : null,
+      h(
+        "div",
+        { class: "row" },
+        status.enabled
+          ? [
+              h("button", { type: "button", class: "btn secondary small", onclick: renewCodes }, "Neue Wiederherstellungscodes"),
+              h("button", { type: "button", class: "btn danger small", onclick: disable }, "Abschalten"),
+            ]
+          : h("button", { type: "button", class: "btn secondary", onclick: enable }, icon("smartphone", "sm"), "Einrichten"),
+      ),
+    );
+  }
+
+  async function enable(event) {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      if (await setupTotp()) {
+        Object.assign(status, await api("totp"));
+        session.user.totpEnabled = true;
+        render();
+        toast("Zwei-Faktor-Anmeldung ist aktiv");
+      }
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function renewCodes() {
+    const result = await totpCodeDialog({
+      title: "Neue Wiederherstellungscodes",
+      text: "Die bisherigen Codes werden dabei ungültig.",
+      confirmLabel: "Erzeugen",
+      action: (code) => api("totp/recovery-codes", { method: "POST", body: { code } }),
+    });
+    if (!result) return;
+    status.recoveryCodesLeft = result.recoveryCodes.length;
+    render();
+    await recoveryCodesDialog(result.recoveryCodes);
+  }
+
+  async function disable() {
+    const done = await totpCodeDialog({
+      title: "Zwei-Faktor-Anmeldung abschalten?",
+      text: "Danach genügt zur Anmeldung wieder dein Passwort. Den Eintrag in der Authenticator-App kannst du anschließend löschen.",
+      confirmLabel: "Abschalten",
+      danger: true,
+      action: (code) => api("totp", { method: "DELETE", body: { code } }),
+    });
+    if (!done) return;
+    Object.assign(status, { enabled: false, recoveryCodesLeft: 0 });
+    session.user.totpEnabled = false;
+    render();
+    toast("Zwei-Faktor-Anmeldung abgeschaltet");
+  }
+
+  render();
+  return container;
+}
+
+// ---------------------------------------------------------------- QR-Code
+// Kleiner QR-Encoder (Byte-Modus, Fehlerkorrektur M) für den Einrichtungslink der Authenticator-App,
+// nach dem Verfahren von Project Nayuki (https://www.nayuki.io/page/qr-code-generator-library, MIT-Lizenz).
+
+const QR_ECC_PER_BLOCK = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28];
+const QR_BLOCKS = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49];
+
+function qrRawModules(version) {
+  let result = (16 * version + 128) * version + 64;
+  if (version >= 2) {
+    const align = Math.floor(version / 7) + 2;
+    result -= (25 * align - 10) * align - 55;
+    if (version >= 7) result -= 36;
+  }
+  return result;
+}
+
+function qrDataCodewords(version) {
+  return Math.floor(qrRawModules(version) / 8) - QR_ECC_PER_BLOCK[version] * QR_BLOCKS[version];
+}
+
+function gfMultiply(x, y) {
+  let z = 0;
+  for (let i = 7; i >= 0; i--) {
+    z = (z << 1) ^ ((z >>> 7) * 0x11d);
+    z ^= ((y >>> i) & 1) * x;
+  }
+  return z;
+}
+
+function reedSolomon(data, degree) {
+  const divisor = new Array(degree).fill(0);
+  divisor[degree - 1] = 1;
+  let root = 1;
+  for (let i = 0; i < degree; i++) {
+    for (let j = 0; j < degree; j++) {
+      divisor[j] = gfMultiply(divisor[j], root);
+      if (j + 1 < degree) divisor[j] ^= divisor[j + 1];
+    }
+    root = gfMultiply(root, 0x02);
+  }
+  const result = new Array(degree).fill(0);
+  for (const byte of data) {
+    const factor = byte ^ result.shift();
+    result.push(0);
+    divisor.forEach((coefficient, i) => (result[i] ^= gfMultiply(coefficient, factor)));
+  }
+  return result;
+}
+
+/** Liefert die Module des QR-Codes als Matrix [y][x] (true = dunkel). */
+function qrMatrix(text) {
+  const bytes = new TextEncoder().encode(text);
+  let version = 1;
+  while (4 + (version < 10 ? 8 : 16) + bytes.length * 8 > qrDataCodewords(version) * 8) {
+    if (++version > 40) throw new Error("Text zu lang für einen QR-Code");
+  }
+
+  // Daten: Modus „Byte“, Länge, Inhalt, Abschluss und Füllbytes
+  const bits = [];
+  const push = (value, length) => {
+    for (let i = length - 1; i >= 0; i--) bits.push((value >>> i) & 1);
+  };
+  push(0b0100, 4);
+  push(bytes.length, version < 10 ? 8 : 16);
+  for (const byte of bytes) push(byte, 8);
+  const capacity = qrDataCodewords(version) * 8;
+  push(0, Math.min(4, capacity - bits.length));
+  push(0, (8 - (bits.length % 8)) % 8);
+  for (let pad = 0xec; bits.length < capacity; pad ^= 0xec ^ 0x11) push(pad, 8);
+  const data = [];
+  for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(""), 2));
+
+  // In Blöcke teilen, Fehlerkorrektur anhängen und verschränken
+  const blockCount = QR_BLOCKS[version];
+  const eccLength = QR_ECC_PER_BLOCK[version];
+  const rawCodewords = Math.floor(qrRawModules(version) / 8);
+  const shortBlocks = blockCount - (rawCodewords % blockCount);
+  const shortLength = Math.floor(rawCodewords / blockCount);
+  const blocks = [];
+  for (let i = 0, offset = 0; i < blockCount; i++) {
+    const block = data.slice(offset, offset + shortLength - eccLength + (i < shortBlocks ? 0 : 1));
+    offset += block.length;
+    const ecc = reedSolomon(block, eccLength);
+    if (i < shortBlocks) block.push(0);
+    blocks.push(block.concat(ecc));
+  }
+  const codewords = [];
+  for (let i = 0; i < blocks[0].length; i++) {
+    blocks.forEach((block, j) => {
+      if (i !== shortLength - eccLength || j >= shortBlocks) codewords.push(block[i]);
+    });
+  }
+
+  // Funktionsmuster: Suchmuster, Timing, Ausrichtung, Versionsinfo
+  const size = version * 4 + 17;
+  const modules = Array.from({ length: size }, () => new Array(size).fill(false));
+  const reserved = Array.from({ length: size }, () => new Array(size).fill(false));
+  const set = (x, y, dark) => {
+    modules[y][x] = dark;
+    reserved[y][x] = true;
+  };
+  for (let i = 0; i < size; i++) {
+    set(6, i, i % 2 === 0);
+    set(i, 6, i % 2 === 0);
+  }
+  for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]]) {
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        const distance = Math.max(Math.abs(dx), Math.abs(dy));
+        if (cx + dx >= 0 && cx + dx < size && cy + dy >= 0 && cy + dy < size) set(cx + dx, cy + dy, distance !== 2 && distance !== 4);
+      }
+    }
+  }
+  if (version > 1) {
+    const count = Math.floor(version / 7) + 2;
+    const step = version === 32 ? 26 : Math.ceil((version * 4 + 4) / (count * 2 - 2)) * 2;
+    const positions = [6];
+    for (let pos = size - 7; positions.length < count; pos -= step) positions.splice(1, 0, pos);
+    positions.forEach((x, i) => positions.forEach((y, j) => {
+      if ((i === 0 && j === 0) || (i === 0 && j === count - 1) || (i === count - 1 && j === 0)) return;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(x + dx, y + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }));
+  }
+  function drawFormat(mask) {
+    // Fehlerkorrektur M hat die Formatbits 00.
+    let rem = mask;
+    for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    const format = ((mask << 10) | rem) ^ 0x5412;
+    const bit = (i) => ((format >>> i) & 1) === 1;
+    for (let i = 0; i <= 5; i++) set(8, i, bit(i));
+    set(8, 7, bit(6));
+    set(8, 8, bit(7));
+    set(7, 8, bit(8));
+    for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+    for (let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+    for (let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+    set(8, size - 8, true);
+  }
+  drawFormat(0);
+  if (version >= 7) {
+    let rem = version;
+    for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1f25);
+    const info = (version << 12) | rem;
+    for (let i = 0; i < 18; i++) {
+      const dark = ((info >>> i) & 1) === 1;
+      set(size - 11 + (i % 3), Math.floor(i / 3), dark);
+      set(Math.floor(i / 3), size - 11 + (i % 3), dark);
+    }
+  }
+
+  // Daten im Zickzack von unten rechts einsetzen
+  let index = 0;
+  for (let right = size - 1; right >= 1; right -= 2) {
+    if (right === 6) right = 5;
+    for (let vert = 0; vert < size; vert++) {
+      for (let j = 0; j < 2; j++) {
+        const x = right - j;
+        const y = ((right + 1) & 2) === 0 ? size - 1 - vert : vert;
+        if (!reserved[y][x] && index < codewords.length * 8) {
+          modules[y][x] = ((codewords[index >>> 3] >>> (7 - (index & 7))) & 1) === 1;
+          index++;
+        }
+      }
+    }
+  }
+
+  // Maske mit den wenigsten Strafpunkten wählen (Läufe, 2×2-Blöcke, Hell-Dunkel-Verhältnis)
+  const MASKS = [
+    (x, y) => (x + y) % 2 === 0,
+    (x, y) => y % 2 === 0,
+    (x) => x % 3 === 0,
+    (x, y) => (x + y) % 3 === 0,
+    (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0,
+    (x, y) => ((x * y) % 2) + ((x * y) % 3) === 0,
+    (x, y) => (((x * y) % 2) + ((x * y) % 3)) % 2 === 0,
+    (x, y) => (((x + y) % 2) + ((x * y) % 3)) % 2 === 0,
+  ];
+  const applyMask = (mask) => {
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!reserved[y][x] && MASKS[mask](x, y)) modules[y][x] = !modules[y][x];
+  };
+  function penalty() {
+    let score = 0;
+    let dark = 0;
+    for (let a = 0; a < size; a++) {
+      let rowRun = 1;
+      let colRun = 1;
+      for (let b = 1; b <= size; b++) {
+        if (b < size && modules[a][b] === modules[a][b - 1]) rowRun++;
+        else {
+          if (rowRun >= 5) score += rowRun - 2;
+          rowRun = 1;
+        }
+        if (b < size && modules[b][a] === modules[b - 1][a]) colRun++;
+        else {
+          if (colRun >= 5) score += colRun - 2;
+          colRun = 1;
+        }
+      }
+      for (let b = 0; b < size; b++) {
+        if (modules[a][b]) dark++;
+        if (a + 1 < size && b + 1 < size && modules[a][b] === modules[a][b + 1] && modules[a][b] === modules[a + 1][b] && modules[a][b] === modules[a + 1][b + 1]) score += 3;
+      }
+    }
+    return score + Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size)) * 10;
+  }
+  let best = 0;
+  let bestScore = Infinity;
+  for (let mask = 0; mask < 8; mask++) {
+    applyMask(mask);
+    drawFormat(mask);
+    const score = penalty();
+    if (score < bestScore) [best, bestScore] = [mask, score];
+    applyMask(mask);
+  }
+  applyMask(best);
+  drawFormat(best);
+  return modules;
+}
+
+/** QR-Code als SVG, immer dunkel auf hell (auch im dunklen Design), mit Ruhezone. */
+function qrCode(text, label) {
+  const modules = qrMatrix(text);
+  const size = modules.length + 8;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+  svg.setAttribute("class", "qr");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", label);
+  svg.setAttribute("shape-rendering", "crispEdges");
+  const background = document.createElementNS(ns, "rect");
+  background.setAttribute("width", size);
+  background.setAttribute("height", size);
+  background.setAttribute("fill", "#fff");
+  let d = "";
+  modules.forEach((row, y) => row.forEach((dark, x) => {
+    if (dark) d += `M${x + 4} ${y + 4}h1v1h-1z`;
+  }));
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", d);
+  path.setAttribute("fill", "#000");
+  svg.append(background, path);
+  return svg;
 }
 
 // ---------------------------------------------------------------- Ziele: Bausteine
@@ -1368,6 +1786,7 @@ function usersCard(users) {
       `Seit ${formatDate(entry.createdAt)}`,
       plural(entry.destinationCount, "Ziel", "Ziele"),
       entry.passkeyCount ? plural(entry.passkeyCount, "Passkey", "Passkeys") : null,
+      entry.totpEnabled ? "2FA aktiv" : null,
       entry.mustChangePassword ? "Passwort noch nicht geändert" : null,
       entry.disabled ? `gesperrt seit ${formatDate(entry.disabledAt)}` : null,
     ].filter(Boolean).join(" · ");
@@ -1402,6 +1821,7 @@ function usersCard(users) {
                 { class: "row user-actions" },
                 iconButton("key", `Neues Passwort für ${entry.username}`, () => resetPassword(entry)),
                 iconButton("fingerprint", `Passkeys von ${entry.username}`, () => managePasskeys(entry)),
+                entry.totpEnabled ? iconButton("smartphone", `Zwei-Faktor-Anmeldung von ${entry.username} abschalten`, () => resetTotp(entry)) : null,
                 iconButton(entry.disabled ? "unlock" : "lock", `${entry.username} ${entry.disabled ? "entsperren" : "sperren"}`, () => toggleLock(entry)),
                 iconButton("trash", `${entry.username} löschen`, () => remove(entry), "danger"),
               ),
@@ -1477,6 +1897,21 @@ function usersCard(users) {
     await dialog({ title: `Passkeys von ${entry.username}`, content: [list, empty], confirmLabel: "Schließen", cancelLabel: null });
   }
 
+  // Nach einem verlorenen Handy ohne Wiederherstellungscodes: 2FA abschalten, damit das Passwort wieder genügt.
+  async function resetTotp(entry) {
+    const done = await dialog({
+      title: `Zwei-Faktor-Anmeldung von ${entry.username} abschalten?`,
+      text: `${entry.username} kann sich danach allein mit dem Passwort anmelden und die Zwei-Faktor-Anmeldung im Profil neu einrichten. Tu das nur, wenn du sicher bist, dass die Anfrage wirklich von ${entry.username} kommt.`,
+      confirmLabel: "Abschalten",
+      danger: true,
+      onConfirm: () => api(`users/${entry.id}/totp`, { method: "DELETE" }),
+    });
+    if (!done) return;
+    entry.totpEnabled = false;
+    renderList();
+    toast(`Zwei-Faktor-Anmeldung von ${entry.username} abgeschaltet`);
+  }
+
   async function toggleLock(entry) {
     const disabled = !entry.disabled;
     if (disabled && !(await confirmDialog(
@@ -1546,7 +1981,7 @@ async function profilePage() {
   setTitle("Profil");
   const user = session.user;
   const isAdmin = user.role === "ADMIN";
-  const [tags, users, passkeys] = await Promise.all([api("tags"), isAdmin ? api("users") : [], api("passkeys")]);
+  const [tags, users, passkeys, totp] = await Promise.all([api("tags"), isAdmin ? api("users") : [], api("passkeys"), api("totp")]);
 
   const passwordForm = h(
     "form",
@@ -1642,6 +2077,7 @@ async function profilePage() {
       { class: "card" },
       sectionTitle("shield", "Anmeldung & Sicherheit"),
       passkeySection(passkeys),
+      totpSection(totp),
       h("details", { class: "disclosure" }, h("summary", null, h("span", { class: "row" }, icon("lock", "sm"), "Passwort ändern"), icon("down", "sm")), passwordForm),
     ),
     tagSection,
@@ -1695,7 +2131,8 @@ function authPage({ setup }) {
     if (setup && data.get("password") !== data.get("repeatPassword")) throw new Error("Die Passwörter stimmen nicht überein");
     abortPasskeyRequest();
     const result = await api(setup ? "setup" : "login", { method: "POST", body: { username: data.get("username"), password: data.get("password") } });
-    signedIn(result.user);
+    if (result.totpRequired) card.replaceChildren(totpLoginForm(() => card.replaceChildren(...passwordStep)));
+    else signedIn(result.user);
   });
 
   async function passkeyLogin(conditional) {
@@ -1716,19 +2153,7 @@ function authPage({ setup }) {
     PublicKeyCredential.isConditionalMediationAvailable?.().then((available) => available && passkeyLogin(true)).catch(() => undefined);
   }
 
-  return h(
-    "div",
-    { class: "auth" },
-    h(
-      "div",
-      { class: "auth-head" },
-      h("img", { src: "icon.svg", alt: "" }),
-      h("h1", null, setup ? "Willkommen!" : "Willkommen zurück"),
-      h("p", { class: "muted" }, setup ? "Es gibt noch keine Benutzer. Lege den ersten Zugang an – er erhält Administratorrechte." : "Melde dich an, um deine Ausflugsziele zu sehen."),
-    ),
-    h(
-      "div",
-      { class: "card" },
+  const passwordStep = [
       passkeys
         ? [
             h("button", {
@@ -1746,10 +2171,77 @@ function authPage({ setup }) {
           ]
         : null,
       form,
+  ].flat().filter(Boolean);
+  const card = h("div", { class: "card" }, passwordStep);
+
+  return h(
+    "div",
+    { class: "auth" },
+    h(
+      "div",
+      { class: "auth-head" },
+      h("img", { src: "icon.svg", alt: "" }),
+      h("h1", null, setup ? "Willkommen!" : "Willkommen zurück"),
+      h("p", { class: "muted" }, setup ? "Es gibt noch keine Benutzer. Lege den ersten Zugang an – er erhält Administratorrechte." : "Melde dich an, um deine Ausflugsziele zu sehen."),
     ),
+    card,
     setup ? h("p", { class: "muted small" }, "Nach der Einrichtung kannst du zusätzlich einen Passkey anlegen.") : null,
     appFooter(),
   );
+}
+
+/** Zweiter Schritt nach dem Passwort: Code aus der Authenticator-App oder ein Wiederherstellungscode. */
+function totpLoginForm(back) {
+  let recovery = false;
+  const input = totpInput({ autofocus: true });
+  const label = h("label", { for: "totp-code" });
+  input.id = "totp-code";
+  const intro = h("p", { class: "muted small" });
+  const switchButton = h("button", { type: "button", class: "btn ghost small", onclick: () => toggle(!recovery) });
+  function toggle(value) {
+    recovery = value;
+    label.textContent = recovery ? "Wiederherstellungscode" : "Code aus der App";
+    intro.textContent = recovery
+      ? "Gib einen deiner Wiederherstellungscodes ein, z. B. „k7mp-x9qr“. Jeder funktioniert nur einmal."
+      : "Öffne deine Authenticator-App und gib den sechsstelligen Code für die Ausflugskiste ein.";
+    switchButton.textContent = recovery ? "Doch Code aus der App verwenden" : "Kein Zugriff auf die App?";
+    input.inputMode = recovery ? "text" : "numeric";
+    input.autocomplete = recovery ? "off" : "one-time-code";
+    input.placeholder = recovery ? "xxxx-xxxx" : "123 456";
+    input.value = "";
+    input.focus();
+  }
+
+  const form = h(
+    "form",
+    null,
+    h("div", { class: "section-title" }, h("span", { class: "section-icon" }, icon("smartphone")), h("div", null, h("h2", null, "Zwei-Faktor-Anmeldung"), intro)),
+    h("div", { class: "field" }, label, input),
+    h("button", { type: "submit", class: "btn block" }, "Anmelden"),
+    h("div", { class: "row spread" }, h("button", { type: "button", class: "btn ghost small", onclick: back }, icon("back", "sm"), "Zurück"), switchButton),
+  );
+  bindForm(form, async (data) => {
+    try {
+      const result = await api("login/totp", { method: "POST", body: { code: data.get("code") } });
+      signedIn(result.user);
+      if (result.recoveryCodesLeft !== null) {
+        toast(result.recoveryCodesLeft
+          ? `Wiederherstellungscode verbraucht – noch ${result.recoveryCodesLeft} übrig.`
+          : "Das war dein letzter Wiederherstellungscode. Erzeuge im Profil neue.", result.recoveryCodesLeft > 3 ? "info" : "error");
+      }
+    } catch (error) {
+      if (error.code === "TOTP_EXPIRED") {
+        back();
+        toast(error.message, "error");
+        return;
+      }
+      input.select();
+      throw error;
+    }
+  });
+  toggle(false);
+  setTimeout(() => input.focus());
+  return form;
 }
 
 /** Nach einem vom Admin vergebenen Passwort: eigenes Passwort festlegen, bevor es weitergeht. */
