@@ -8,7 +8,12 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
-_Nichts._
+### Hinzugefügt
+- **Versionsprüfung:** Ganz unten im Profil steht jetzt, ob auf GitHub eine neuere Version erschienen ist
+  (für Admins mit Link zum Release), sonst „Das ist die neueste Version.“ Die Abfrage stellt der Server
+  (neuer Endpunkt `GET version`, über cURL oder `allow_url_fopen`), nicht der Browser. Das Ergebnis merkt er sich
+  12 Stunden in `data/release.json`, nach einem Fehlschlag fragt er frühestens nach einer Stunde erneut.
+  Version 0.5.0.
 
 ## [0.4.2] – 2026-10-16
 

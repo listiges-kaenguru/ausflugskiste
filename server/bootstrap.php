@@ -4,7 +4,7 @@
 
 declare(strict_types=1);
 
-const APP_VERSION = '0.4.2';
+const APP_VERSION = '0.5.0';
 // Link zum Quelltext, den die App allen Nutzern anzeigt (AGPL-3.0, Abschnitt 13).
 // Wer eine veränderte Fassung betreibt, muss hier auf deren Quelltext verweisen.
 const SOURCE_URL = 'https://github.com/listiges-kaenguru/ausflugskiste';
@@ -370,4 +370,63 @@ function respond_error(ApiException $error): never
     }
     echo json_encode(['success' => false, 'error' => $body], JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+// ---------------------------------------------------------------- Versionsprüfung
+
+// Der Server fragt GitHub (nicht der Browser): keine Verbindung der Nutzer zu Dritten, und dank
+// Zwischenspeicher in data/release.json reicht eine Anfrage je Installation und Halbtag.
+const RELEASE_API = 'https://api.github.com/repos/listiges-kaenguru/ausflugskiste/releases/latest';
+const RELEASE_MAX_AGE = 12 * 3600;
+const RELEASE_RETRY_AFTER = 3600; // nach einem Fehlschlag erst nach einer Stunde erneut fragen
+
+/** Versionsnummer des neuesten Releases von GitHub oder null (kein Netz, Limit, gesperrt …) */
+function fetch_latest_release(): ?string
+{
+    $headers = ['Accept: application/vnd.github+json', 'User-Agent: Ausflugskiste'];
+    $body = false;
+    $status = 0;
+    if (function_exists('curl_init')) {
+        $ch = curl_init(RELEASE_API);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 5,
+        ]);
+        $body = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    } elseif (ini_get('allow_url_fopen')) {
+        $context = stream_context_create(['http' => ['header' => $headers, 'timeout' => 5, 'ignore_errors' => true]]);
+        $body = @file_get_contents(RELEASE_API, false, $context);
+        $status = preg_match('#^HTTP/\S+ (\d+)#', $http_response_header[0] ?? '', $m) ? (int) $m[1] : 0;
+    }
+    if (!is_string($body) || $status !== 200) {
+        return null;
+    }
+    $tag = json_decode($body, true)['tag_name'] ?? null;
+    return is_string($tag) && preg_match('/^v?(\d+\.\d+\.\d+)$/', $tag, $m) ? $m[1] : null;
+}
+
+/** Neuestes Release aus dem Zwischenspeicher bzw. frisch von GitHub: ['version' => ?string, 'checkedAt' => ?int] */
+function latest_release(): array
+{
+    $file = data_dir() . '/release.json';
+    $cached = is_file($file) ? (json_decode((string) @file_get_contents($file), true) ?: []) : [];
+    $version = is_string($cached['version'] ?? null) ? $cached['version'] : null;
+    $checkedAt = is_int($cached['checkedAt'] ?? null) ? $cached['checkedAt'] : null;
+    $triedAt = is_int($cached['triedAt'] ?? null) ? $cached['triedAt'] : 0;
+
+    $now = time();
+    $fresh = $checkedAt !== null && $now - $checkedAt < RELEASE_MAX_AGE;
+    if ($fresh || $now - $triedAt < RELEASE_RETRY_AFTER) {
+        return ['version' => $version, 'checkedAt' => $checkedAt];
+    }
+
+    $latest = fetch_latest_release();
+    if ($latest !== null) {
+        $version = $latest;
+        $checkedAt = $now;
+    }
+    @file_put_contents($file, json_encode(['version' => $version, 'checkedAt' => $checkedAt, 'triedAt' => $now]), LOCK_EX);
+    return ['version' => $version, 'checkedAt' => $checkedAt];
 }

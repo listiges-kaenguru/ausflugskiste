@@ -31,6 +31,7 @@ try {
 
     match (true) {
         $resource === 'me' && $method === 'GET' => me(),
+        $resource === 'version' && $method === 'GET' => version_info(),
         $resource === 'setup' && $method === 'POST' => setup(),
         $resource === 'login' && $id === null && $method === 'POST' => login(),
         $resource === 'login' && $id === 'totp' && $method === 'POST' => login_totp(),
@@ -139,6 +140,18 @@ function me(): never
         'totp' => encryption_available(),
         'version' => APP_VERSION,
         'sourceUrl' => SOURCE_URL,
+    ]);
+}
+
+// Installierte Version und neuestes Release auf GitHub (für den Hinweis im Profil)
+function version_info(): never
+{
+    require_user();
+    $release = latest_release();
+    respond([
+        'installed' => APP_VERSION,
+        'latest' => $release['version'],
+        'checkedAt' => $release['checkedAt'] !== null ? gmdate('c', $release['checkedAt']) : null,
     ]);
 }
 

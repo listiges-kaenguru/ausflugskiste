@@ -200,6 +200,8 @@ umbenennen und löschen können nur Administratoren.
 ### Abmelden
 
 Oben im Profil auf **Abmelden** tippen. Ganz unten steht die Version der App mit einem Link zum Quelltext.
+Darunter siehst du, ob auf GitHub schon eine neuere Version erschienen ist. Einspielen kann sie nur dein Admin;
+als Admin findest du dort den Link **Zum Release**.
 
 ## 10. Häufige Fragen
 

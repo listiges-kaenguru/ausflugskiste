@@ -2066,7 +2066,35 @@ async function profilePage() {
     tagSection,
     isAdmin ? usersCard(users) : null,
     appFooter(),
+    updateNote(isAdmin),
   ];
+}
+
+// Hinweis auf eine neuere Version auf GitHub; lädt nachträglich, damit das Profil nicht auf GitHub wartet.
+function updateNote(isAdmin) {
+  const note = h("p", { class: "footer-note" }, "Suche nach neuer Version …");
+  api("version")
+    .then(({ installed, latest }) => {
+      if (!latest) return note.replaceChildren("Die neueste Version auf GitHub konnte nicht abgerufen werden.");
+      if (compareVersions(latest, installed) <= 0) return note.replaceChildren("Das ist die neueste Version.");
+      note.replaceChildren(
+        `Version ${latest} ist auf GitHub erschienen. `,
+        isAdmin ? h("a", { href: `${session.sourceUrl}/releases/latest`, target: "_blank", rel: "noopener" }, "Zum Release") : "Dein Admin kann sie einspielen.",
+      );
+    })
+    .catch(() => note.replaceChildren());
+  return note;
+}
+
+/** SemVer ohne Vorabversionen vergleichen: < 0, 0 oder > 0 */
+function compareVersions(a, b) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff) return diff;
+  }
+  return 0;
 }
 
 // Version und Link zum Quelltext (von der AGPL für Nutzer über das Netzwerk verlangt).
