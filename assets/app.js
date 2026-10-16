@@ -25,7 +25,6 @@ function h(tag, props, ...children) {
 // Icon-Pfade aus Lucide (https://lucide.dev, ISC-Lizenz)
 const ICONS = {
   compass: '<path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/>',
-  plus: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>',
   add: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   user: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/>',
@@ -180,12 +179,13 @@ function field(label, input, { hint, optional } = {}) {
   );
 }
 
+/** Überschrift mit Icon; `subtitle` ist ein Text oder ein fertiges Element. */
 function sectionTitle(iconName, title, subtitle) {
   return h(
     "div",
     { class: "section-title" },
     h("span", { class: "section-icon" }, icon(iconName)),
-    h("div", null, h("h2", null, title), subtitle ? h("p", { class: "muted small" }, subtitle) : null),
+    h("div", null, h("h2", null, title), subtitle instanceof Node ? subtitle : subtitle ? h("p", { class: "muted small" }, subtitle) : null),
   );
 }
 
@@ -295,30 +295,46 @@ function confirmDialog(title, text, confirmLabel) {
   return dialog({ title, text, confirmLabel, danger: true }).then(Boolean);
 }
 
-function iconButton(iconName, label, onclick, variant = "ghost") {
-  return h("button", { type: "button", class: `btn ${variant} small icon-only`, "aria-label": label, title: label, onclick }, icon(iconName, "sm"));
+/** Kleiner Button nur mit Icon; `title` ist der Tooltip, falls er kürzer sein soll als `label`. */
+function iconButton(iconName, label, onclick, variant = "ghost", title = label) {
+  return h("button", { type: "button", class: `btn ${variant} small icon-only`, "aria-label": label, title, onclick }, icon(iconName, "sm"));
+}
+
+/** Button, der `text` in die Zwischenablage kopiert; `onFail` läuft, bevor die Fehlermeldung erscheint. */
+function copyButton(text, { className = "btn secondary small", onFail } = {}) {
+  const button = h("button", {
+    type: "button",
+    class: className,
+    onclick: async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        button.replaceChildren(icon("tick", "sm"), "Kopiert");
+      } catch {
+        onFail?.();
+        toast("Kopieren nicht möglich – bitte markieren und manuell kopieren", "error");
+      }
+    },
+  }, icon("copy", "sm"), "Kopieren");
+  return button;
+}
+
+/** Sperrt den Button, solange `action` läuft. */
+async function whileBusy(button, action) {
+  button.disabled = true;
+  try {
+    await action();
+  } finally {
+    button.disabled = false;
+  }
 }
 
 /** Zeigt ein vom Server erzeugtes Passwort einmalig an, mit Kopier-Button. */
 function passwordDialog({ title, username, password }) {
   const input = h("input", { type: "text", class: "password-box", value: password, readonly: true, "aria-label": "Passwort", onfocus: (event) => event.target.select() });
-  const copyButton = h("button", {
-    type: "button",
-    class: "btn secondary",
-    onclick: async () => {
-      try {
-        await navigator.clipboard.writeText(password);
-        copyButton.replaceChildren(icon("tick", "sm"), "Kopiert");
-      } catch {
-        input.focus();
-        toast("Kopieren nicht möglich – bitte markieren und manuell kopieren", "error");
-      }
-    },
-  }, icon("copy", "sm"), "Kopieren");
   return dialog({
     title,
     text: `Gib ${username} dieses Passwort weiter. Es wird nur jetzt angezeigt; bei der nächsten Anmeldung muss ${username} ein eigenes Passwort festlegen.`,
-    content: h("div", { class: "password-row" }, input, copyButton),
+    content: h("div", { class: "password-row" }, input, copyButton(password, { className: "btn secondary", onFail: () => input.focus() })),
     confirmLabel: "Fertig",
     cancelLabel: null,
   });
@@ -456,19 +472,15 @@ function passkeyBanner() {
       h("button", {
         type: "button",
         class: "btn small",
-        onclick: async (event) => {
-          const button = event.currentTarget;
-          button.disabled = true;
+        onclick: (event) => whileBusy(event.currentTarget, async () => {
           try {
             await registerPasskey();
             toast("Passkey gespeichert – ab jetzt geht die Anmeldung ohne Passwort.");
             banner.remove();
           } catch (error) {
             if (!error.cancelled) toast(error.message, "error");
-          } finally {
-            button.disabled = false;
           }
-        },
+        }),
       }, icon("key", "sm"), "Einrichten"),
     ),
   );
@@ -486,19 +498,9 @@ function totpInput(props = {}) {
   return h("input", { type: "text", name: "code", inputmode: "numeric", autocomplete: "one-time-code", autocapitalize: "none", spellcheck: "false", maxlength: "20", required: true, class: "code-input", ...props });
 }
 
-async function copyText(text, button) {
-  try {
-    await navigator.clipboard.writeText(text);
-    button.replaceChildren(icon("tick", "sm"), "Kopiert");
-  } catch {
-    toast("Kopieren nicht möglich – bitte markieren und manuell kopieren", "error");
-  }
-}
-
 /** Zeigt neue Wiederherstellungscodes einmalig an, zum Kopieren oder Herunterladen. */
 function recoveryCodesDialog(codes) {
   const text = `Ausflugskiste – Wiederherstellungscodes für ${session.user.username}\nJeder Code funktioniert genau einmal.\n\n${codes.join("\n")}\n`;
-  const copyButton = h("button", { type: "button", class: "btn secondary small", onclick: () => copyText(text, copyButton) }, icon("copy", "sm"), "Kopieren");
   const downloadButton = h("button", {
     type: "button",
     class: "btn secondary small",
@@ -511,7 +513,7 @@ function recoveryCodesDialog(codes) {
   return dialog({
     title: "Wiederherstellungscodes",
     text: "Falls du keinen Zugriff auf deine Authenticator-App hast, meldest du dich mit einem dieser Codes an – jeder funktioniert genau einmal. Bewahre sie sicher auf, z. B. im Passwortmanager oder ausgedruckt. Sie werden nur jetzt angezeigt.",
-    content: [h("ol", { class: "code-list" }, codes.map((code) => h("li", null, code))), h("div", { class: "row" }, copyButton, downloadButton)],
+    content: [h("ol", { class: "code-list" }, codes.map((code) => h("li", null, code))), h("div", { class: "row" }, copyButton(text), downloadButton)],
     confirmLabel: "Ich habe sie gesichert",
     cancelLabel: null,
   });
@@ -521,7 +523,6 @@ function recoveryCodesDialog(codes) {
 async function setupTotp() {
   const { secret, uri } = await api("totp/setup", { method: "POST" });
   const grouped = secret.match(/.{1,4}/g).join(" ");
-  const copyButton = h("button", { type: "button", class: "btn secondary small", onclick: () => copyText(secret, copyButton) }, icon("copy", "sm"), "Kopieren");
   const result = await dialog({
     title: "Zwei-Faktor-Anmeldung einrichten",
     content: [
@@ -537,7 +538,7 @@ async function setupTotp() {
           h("a", { href: uri, class: "btn secondary small" }, icon("smartphone", "sm"), "In App auf diesem Gerät öffnen"),
           h("span", { class: "muted small" }, "Oder diesen Schlüssel in der App eingeben (zeitbasiert, 6 Stellen):"),
           h("code", { class: "totp-secret", "aria-label": "Geheimer Schlüssel" }, grouped),
-          copyButton,
+          copyButton(secret),
         ),
       ),
       field("2. Code aus der App eingeben", totpInput({ placeholder: "123 456" })),
@@ -603,21 +604,19 @@ function totpSection(status) {
     );
   }
 
-  async function enable(event) {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      if (await setupTotp()) {
-        Object.assign(status, await api("totp"));
-        session.user.totpEnabled = true;
-        render();
-        toast("Zwei-Faktor-Anmeldung ist aktiv");
+  function enable(event) {
+    return whileBusy(event.currentTarget, async () => {
+      try {
+        if (await setupTotp()) {
+          Object.assign(status, await api("totp"));
+          session.user.totpEnabled = true;
+          render();
+          toast("Zwei-Faktor-Anmeldung ist aktiv");
+        }
+      } catch (error) {
+        toast(error.message, "error");
       }
-    } catch (error) {
-      toast(error.message, "error");
-    } finally {
-      button.disabled = false;
-    }
+    });
   }
 
   async function renewCodes() {
@@ -919,6 +918,10 @@ function cover(destination, ...extra) {
   );
 }
 
+function addressLine(address) {
+  return address ? h("p", { class: "meta" }, icon("pin", "sm"), h("span", null, address)) : null;
+}
+
 function stars(rating) {
   return h(
     "span",
@@ -993,7 +996,7 @@ function destinationCard(destination, onChange) {
       "div",
       { class: "dest-body" },
       h("h3", null, h("a", { href, class: "dest-link" }, destination.name)),
-      destination.address ? h("p", { class: "meta" }, icon("pin", "sm"), h("span", null, destination.address)) : null,
+      addressLine(destination.address),
       destination.tags.length
         ? h("div", { class: "tags" }, destination.tags.slice(0, 3).map((tag) => h("span", { class: "tag" }, tag.name)), destination.tags.length > 3 ? h("span", { class: "tag" }, `+${destination.tags.length - 3}`) : null)
         : null,
@@ -1019,7 +1022,7 @@ function randomDestinationDialog(destinations) {
         "div",
         { class: "pick-body" },
         h("h3", null, current.name),
-        current.address ? h("p", { class: "meta" }, icon("pin", "sm"), h("span", null, current.address)) : null,
+        addressLine(current.address),
         stars(current.rating),
       ),
     );
@@ -1228,9 +1231,8 @@ async function dashboardPage({ focusSearch = false } = {}) {
     Object.entries(SORTS).map(([key, [label]]) => h("option", { value: key, selected: listState.sort === key }, label)),
   );
 
-  function matches(destination, query) {
-    const segment = SEGMENTS.find(([key]) => key === listState.segment);
-    if (!segment[2](destination)) return false;
+  function matches(destination, inSegment, query) {
+    if (!inSegment(destination)) return false;
     if ((destination.rating ?? 0) < listState.minRating) return false;
     for (const name of listState.tags) if (!destination.tags.some((tag) => tag.name === name)) return false;
     if (query) {
@@ -1246,9 +1248,11 @@ async function dashboardPage({ focusSearch = false } = {}) {
 
   function update() {
     const query = listState.search.trim().toLocaleLowerCase("de");
-    visible = destinations.filter((d) => matches(d, query)).sort(SORTS[listState.sort][1]);
+    const [, , inSegment] = SEGMENTS.find(([key]) => key === listState.segment);
+    visible = destinations.filter((d) => matches(d, inSegment, query)).sort(SORTS[listState.sort][1]);
     pickButton.hidden = visible.length === 0;
     const extraFilters = (listState.minRating > 0 ? 1 : 0) + listState.tags.size;
+    const filtered = filtersActive();
 
     renderSegments();
     renderFilters();
@@ -1256,8 +1260,8 @@ async function dashboardPage({ focusSearch = false } = {}) {
     filterButton.setAttribute("aria-expanded", String(listState.showFilters));
     filterBadge.textContent = extraFilters;
     filterBadge.hidden = extraFilters === 0;
-    resetButton.disabled = !filtersActive();
-    resultCount.textContent = filtersActive() ? `${plural(visible.length, "Treffer", "Treffer")} von ${destinations.length}` : plural(visible.length, "Ziel", "Ziele");
+    resetButton.disabled = !filtered;
+    resultCount.textContent = filtered ? `${plural(visible.length, "Treffer", "Treffer")} von ${destinations.length}` : plural(visible.length, "Ziel", "Ziele");
 
     results.replaceChildren(...visible.map((d) => destinationCard(d, renderSegments)));
     if (visible.length === 0) {
@@ -1370,7 +1374,7 @@ async function detailPage(id) {
         "div",
         { class: "hero-title" },
         h("h1", null, destination.name),
-        destination.address ? h("p", { class: "meta" }, icon("pin", "sm"), h("span", null, destination.address)) : null,
+        addressLine(destination.address),
       ),
     );
   }
@@ -1511,11 +1515,12 @@ function ratingInput(value) {
   const label = h("span", { class: "muted small" });
   const starsGroup = h("span", { class: "rating-stars" });
   // Umgekehrte Reihenfolge, damit CSS mit „~“ die niedrigeren Sterne einfärben kann.
-  for (const stars of [5, 4, 3, 2, 1]) {
-    const id = `rating-${stars}`;
+  for (const count of [5, 4, 3, 2, 1]) {
+    const id = `rating-${count}`;
+    const text = plural(count, "Stern", "Sterne");
     starsGroup.append(
-      h("input", { type: "radio", name: "rating", id, value: String(stars), checked: value === stars, onchange: update }),
-      h("label", { for: id, title: plural(stars, "Stern", "Sterne") }, icon("star"), h("span", { class: "sr-only" }, plural(stars, "Stern", "Sterne"))),
+      h("input", { type: "radio", name: "rating", id, value: String(count), checked: value === count, onchange: update }),
+      h("label", { for: id, title: text }, icon("star"), h("span", { class: "sr-only" }, text)),
     );
   }
   const clear = h("button", {
@@ -1686,92 +1691,90 @@ async function editPage(id) {
 
 // ---------------------------------------------------------------- Seiten: Profil
 
+/** Listeneintrag eines Passkeys mit Name, Datum und Aktions-Buttons. */
+function passkeyItem(passkey, ...actions) {
+  return h(
+    "li",
+    null,
+    h("span", { class: "list-icon" }, icon("key", "sm")),
+    h(
+      "div",
+      { class: "grow" },
+      h("span", null, passkey.name),
+      h("span", { class: "muted small" }, `Angelegt am ${formatDate(passkey.createdAt)}`, passkey.lastUsedAt ? ` · zuletzt genutzt am ${formatDate(passkey.lastUsedAt)}` : " · noch nicht genutzt"),
+    ),
+    actions,
+  );
+}
+
 function passkeySection(passkeys) {
   const list = h("ul", { class: "list" });
   const addButton = h("button", { type: "button", class: "btn secondary", onclick: add }, icon("add", "sm"), "Passkey hinzufügen");
 
+  async function rename(passkey) {
+    const renamed = await promptDialog({
+      title: "Passkey umbenennen",
+      label: "Name",
+      value: passkey.name,
+      maxlength: 60,
+      save: (name) => api(`passkeys/${passkey.id}`, { method: "PUT", body: { name } }),
+    });
+    if (renamed) {
+      Object.assign(passkey, renamed);
+      renderList();
+    }
+  }
+
+  async function remove(passkey) {
+    const confirmed = await confirmDialog(
+      "Passkey entfernen?",
+      `Mit „${passkey.name}“ kannst du dich danach nicht mehr anmelden. Dein Passwort bleibt gültig.`,
+      "Entfernen",
+    );
+    if (!confirmed) return;
+    try {
+      const result = await api(`passkeys/${passkey.id}`, { method: "DELETE" });
+      forgetPasskey(result.credentialId);
+      passkeys.splice(passkeys.indexOf(passkey), 1);
+      renderList();
+      toast("Passkey entfernt");
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  }
+
   function renderList() {
     list.replaceChildren(
       ...passkeys.map((passkey) =>
-        h(
-          "li",
-          null,
-          h("span", { class: "list-icon" }, icon("key", "sm")),
-          h(
-            "div",
-            { class: "grow" },
-            h("span", null, passkey.name),
-            h("span", { class: "muted small" }, `Angelegt am ${formatDate(passkey.createdAt)}`, passkey.lastUsedAt ? ` · zuletzt genutzt am ${formatDate(passkey.lastUsedAt)}` : " · noch nicht genutzt"),
-          ),
-          h("button", {
-            type: "button",
-            class: "btn ghost small icon-only",
-            "aria-label": `${passkey.name} umbenennen`,
-            title: "Umbenennen",
-            onclick: async () => {
-              const renamed = await promptDialog({
-                title: "Passkey umbenennen",
-                label: "Name",
-                value: passkey.name,
-                maxlength: 60,
-                save: (name) => api(`passkeys/${passkey.id}`, { method: "PUT", body: { name } }),
-              });
-              if (renamed) {
-                Object.assign(passkey, renamed);
-                renderList();
-              }
-            },
-          }, icon("pencil", "sm")),
-          h("button", {
-            type: "button",
-            class: "btn danger small icon-only",
-            "aria-label": `${passkey.name} entfernen`,
-            title: "Entfernen",
-            onclick: async () => {
-              const confirmed = await confirmDialog(
-                "Passkey entfernen?",
-                `Mit „${passkey.name}“ kannst du dich danach nicht mehr anmelden. Dein Passwort bleibt gültig.`,
-                "Entfernen",
-              );
-              if (!confirmed) return;
-              try {
-                const result = await api(`passkeys/${passkey.id}`, { method: "DELETE" });
-                forgetPasskey(result.credentialId);
-                passkeys.splice(passkeys.indexOf(passkey), 1);
-                renderList();
-                toast("Passkey entfernt");
-              } catch (error) {
-                toast(error.message, "error");
-              }
-            },
-          }, icon("trash", "sm")),
+        passkeyItem(
+          passkey,
+          iconButton("pencil", `${passkey.name} umbenennen`, () => rename(passkey), "ghost", "Umbenennen"),
+          iconButton("trash", `${passkey.name} entfernen`, () => remove(passkey), "danger", "Entfernen"),
         ),
       ),
     );
     list.hidden = passkeys.length === 0;
   }
 
-  async function add() {
-    addButton.disabled = true;
-    try {
-      passkeys.push(await registerPasskey());
-      renderList();
-      toast("Passkey gespeichert");
-    } catch (error) {
-      if (!error.cancelled) toast(error.message, "error");
-    } finally {
-      addButton.disabled = false;
-    }
+  function add() {
+    return whileBusy(addButton, async () => {
+      try {
+        passkeys.push(await registerPasskey());
+        renderList();
+        toast("Passkey gespeichert");
+      } catch (error) {
+        if (!error.cancelled) toast(error.message, "error");
+      }
+    });
   }
 
   renderList();
-  const available = supportsPasskeys();
   return h(
     "div",
     { class: "field" },
     h("div", { class: "card-header" }, h("div", null, h("strong", null, "Passkeys"), h("span", { class: "muted small" }, "Anmelden per Fingerabdruck, Gesicht oder Geräte-PIN – sicherer als ein Passwort und nicht abfischbar."))),
     list,
-    available
+    supportsPasskeys()
       ? h("div", null, addButton)
       : h("p", { class: "hint" }, session.passkeys
         ? "Dein Browser unterstützt hier keine Passkeys. Sie benötigen eine HTTPS-Verbindung (oder localhost)."
@@ -1861,16 +1864,8 @@ function usersCard(users) {
     function renderPasskeys() {
       list.replaceChildren(
         ...passkeys.map((passkey) =>
-          h(
-            "li",
-            null,
-            h("span", { class: "list-icon" }, icon("key", "sm")),
-            h(
-              "div",
-              { class: "grow" },
-              h("span", null, passkey.name),
-              h("span", { class: "muted small" }, `Angelegt am ${formatDate(passkey.createdAt)}`, passkey.lastUsedAt ? ` · zuletzt genutzt am ${formatDate(passkey.lastUsedAt)}` : " · noch nicht genutzt"),
-            ),
+          passkeyItem(
+            passkey,
             iconButton("trash", `${passkey.name} entfernen`, async () => {
               const confirmed = await confirmDialog(
                 "Passkey entfernen?",
@@ -1974,7 +1969,7 @@ function usersCard(users) {
   return h(
     "section",
     { class: "card" },
-    h("div", { class: "section-title" }, h("span", { class: "section-icon" }, icon("users")), h("div", null, h("h2", null, "Benutzer"), count)),
+    sectionTitle("users", "Benutzer", count),
     list,
     h("details", { class: "disclosure" }, h("summary", null, "Neuen Benutzer anlegen", icon("down", "sm")), userForm),
   );
@@ -2005,10 +2000,25 @@ async function profilePage() {
     passwordStatus.success("Passwort wurde geändert.");
   });
 
-  async function tagAction(action, message) {
+  async function renameTag(tag) {
+    const saved = await promptDialog({
+      title: "Tag umbenennen",
+      label: "Name",
+      value: tag.name,
+      maxlength: 50,
+      save: (name) => api(`tags/${tag.id}`, { method: "PUT", body: { name } }),
+    });
+    if (saved) {
+      toast("Tag umbenannt");
+      render();
+    }
+  }
+
+  async function deleteTag(tag) {
+    if (!(await confirmDialog(`Tag „${tag.name}“ löschen?`, "Er wird bei allen Zielen entfernt.", "Löschen"))) return;
     try {
-      await action();
-      toast(message);
+      await api(`tags/${tag.id}`, { method: "DELETE" });
+      toast("Tag gelöscht");
       render();
     } catch (error) {
       toast(error.message, "error");
@@ -2029,43 +2039,13 @@ async function profilePage() {
               "li",
               null,
               h("div", { class: "grow" }, h("span", null, tag.name)),
-              h("button", {
-                type: "button",
-                class: "btn ghost small icon-only",
-                "aria-label": `${tag.name} umbenennen`,
-                title: "Umbenennen",
-                onclick: async () => {
-                  const saved = await promptDialog({
-                    title: "Tag umbenennen",
-                    label: "Name",
-                    value: tag.name,
-                    maxlength: 50,
-                    save: (name) => api(`tags/${tag.id}`, { method: "PUT", body: { name } }),
-                  });
-                  if (saved) {
-                    toast("Tag umbenannt");
-                    render();
-                  }
-                },
-              }, icon("pencil", "sm")),
-              h("button", {
-                type: "button",
-                class: "btn danger small icon-only",
-                "aria-label": `${tag.name} löschen`,
-                title: "Löschen",
-                onclick: async () => {
-                  if (await confirmDialog(`Tag „${tag.name}“ löschen?`, "Er wird bei allen Zielen entfernt.", "Löschen")) {
-                    tagAction(() => api(`tags/${tag.id}`, { method: "DELETE" }), "Tag gelöscht");
-                  }
-                },
-              }, icon("trash", "sm")),
+              iconButton("pencil", `${tag.name} umbenennen`, () => renameTag(tag), "ghost", "Umbenennen"),
+              iconButton("trash", `${tag.name} löschen`, () => deleteTag(tag), "danger", "Löschen"),
             ),
           ),
         )
       : h("div", { class: "tags" }, tags.map((tag) => h("span", { class: "tag" }, tag.name))),
   );
-
-  const userSection = isAdmin ? usersCard(users) : null;
 
   return [
     h(
@@ -2084,7 +2064,7 @@ async function profilePage() {
       h("details", { class: "disclosure" }, h("summary", null, h("span", { class: "row" }, icon("lock", "sm"), "Passwort ändern"), icon("down", "sm")), passwordForm),
     ),
     tagSection,
-    userSection,
+    isAdmin ? usersCard(users) : null,
     appFooter(),
   ];
 }
@@ -2156,25 +2136,14 @@ function authPage({ setup }) {
     PublicKeyCredential.isConditionalMediationAvailable?.().then((available) => available && passkeyLogin(true)).catch(() => undefined);
   }
 
-  const passwordStep = [
-      passkeys
-        ? [
-            h("button", {
-              type: "button",
-              class: "btn block",
-              onclick: async (event) => {
-                const button = event.currentTarget;
-                button.disabled = true;
-                await passkeyLogin(false);
-                button.disabled = false;
-              },
-            }, icon("key", "sm"), "Mit Passkey anmelden"),
-            passkeyError,
-            h("div", { class: "divider" }, "oder mit Passwort"),
-          ]
-        : null,
-      form,
-  ].flat().filter(Boolean);
+  const passwordStep = passkeys
+    ? [
+        h("button", { type: "button", class: "btn block", onclick: (event) => whileBusy(event.currentTarget, () => passkeyLogin(false)) }, icon("key", "sm"), "Mit Passkey anmelden"),
+        passkeyError,
+        h("div", { class: "divider" }, "oder mit Passwort"),
+        form,
+      ]
+    : [form];
   const card = h("div", { class: "card" }, passwordStep);
 
   return h(
@@ -2218,7 +2187,7 @@ function totpLoginForm(back) {
   const form = h(
     "form",
     null,
-    h("div", { class: "section-title" }, h("span", { class: "section-icon" }, icon("smartphone")), h("div", null, h("h2", null, "Zwei-Faktor-Anmeldung"), intro)),
+    sectionTitle("smartphone", "Zwei-Faktor-Anmeldung", intro),
     h("div", { class: "field" }, label, input),
     h("button", { type: "submit", class: "btn block" }, "Anmelden"),
     h("div", { class: "row spread" }, h("button", { type: "button", class: "btn ghost small", onclick: back }, icon("back", "sm"), "Zurück"), switchButton),

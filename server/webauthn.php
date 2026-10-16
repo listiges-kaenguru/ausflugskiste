@@ -29,6 +29,11 @@ function passkeys_available(): bool
     return function_exists('openssl_verify') && function_exists('openssl_pkey_get_public');
 }
 
+function invalid_passkey_data(): never
+{
+    fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+}
+
 function base64url_encode(string $data): string
 {
     return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
@@ -37,7 +42,7 @@ function base64url_encode(string $data): string
 function base64url_decode(mixed $data): string
 {
     if (!is_string($data) || !preg_match('/^[A-Za-z0-9_-]*$/', $data)) {
-        fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+        invalid_passkey_data();
     }
     return (string) base64_decode(strtr($data, '-_', '+/'), true);
 }
@@ -52,13 +57,13 @@ function webauthn_rp_id(): string
 /** Erzeugt eine einmalige Challenge und merkt sie sich in der Session. */
 function webauthn_challenge(string $purpose): string
 {
-    $challenge = random_bytes(32);
+    $challenge = base64url_encode(random_bytes(32));
     $_SESSION['webauthn'] = [
         'purpose' => $purpose,
-        'challenge' => base64url_encode($challenge),
-        'expires' => time() + (int) (WEBAUTHN_TIMEOUT_MS / 1000) + 30,
+        'challenge' => $challenge,
+        'expires' => time() + intdiv(WEBAUTHN_TIMEOUT_MS, 1000) + 30,
     ];
-    return base64url_encode($challenge);
+    return $challenge;
 }
 
 /**
@@ -72,7 +77,7 @@ function webauthn_check_client_data(string $clientDataJSON, string $type, string
 
     $clientData = json_decode($clientDataJSON, true);
     if (!is_array($clientData) || ($clientData['type'] ?? null) !== $type) {
-        fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+        invalid_passkey_data();
     }
     if (
         !is_array($pending) || $pending['purpose'] !== $purpose || $pending['expires'] < time()
@@ -106,9 +111,9 @@ function webauthn_parse_auth_data(string $authData): array
 
     if ($flags & 0x40) {
         if (strlen($authData) < 55) {
-            fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+            invalid_passkey_data();
         }
-        $result['aaguid'] = vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex(substr($authData, 37, 16)), 4));
+        $result['aaguid'] = format_uuid(substr($authData, 37, 16));
         $idLength = unpack('n', substr($authData, 53, 2))[1];
         $result['credentialId'] = substr($authData, 55, $idLength);
         $offset = 55 + $idLength;
@@ -126,11 +131,11 @@ function webauthn_verify_registration(array $body): array
     $offset = 0;
     $attestation = cbor_decode(base64url_decode($body['attestationObject'] ?? null), $offset);
     if (!is_array($attestation) || !is_string($attestation['authData'] ?? null)) {
-        fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+        invalid_passkey_data();
     }
     $authData = webauthn_parse_auth_data($attestation['authData']);
     if (!isset($authData['credentialId'], $authData['publicKey']) || $authData['credentialId'] === '') {
-        fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+        invalid_passkey_data();
     }
     [$algorithm, $pem] = cose_to_pem($authData['publicKey']);
 
@@ -226,7 +231,7 @@ function der_integer(string $bytes): string
 function cbor_decode(string $data, int &$offset, int $depth = 0): mixed
 {
     if ($depth > 16 || $offset >= strlen($data)) {
-        fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+        invalid_passkey_data();
     }
     $initial = ord($data[$offset++]);
     $major = $initial >> 5;
@@ -237,7 +242,7 @@ function cbor_decode(string $data, int &$offset, int $depth = 0): mixed
             20 => false,
             21 => true,
             22, 23 => null,
-            default => fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten'),
+            default => invalid_passkey_data(),
         };
     }
 
@@ -250,7 +255,7 @@ function cbor_decode(string $data, int &$offset, int $depth = 0): mixed
         case 2:
         case 3:
             if ($offset + $value > strlen($data)) {
-                fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+                invalid_passkey_data();
             }
             $bytes = substr($data, $offset, $value);
             $offset += $value;
@@ -266,7 +271,7 @@ function cbor_decode(string $data, int &$offset, int $depth = 0): mixed
             for ($i = 0; $i < $value; $i++) {
                 $key = cbor_decode($data, $offset, $depth + 1);
                 if (!is_int($key) && !is_string($key)) {
-                    fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+                    invalid_passkey_data();
                 }
                 $map[$key] = cbor_decode($data, $offset, $depth + 1);
             }
@@ -281,21 +286,20 @@ function cbor_argument(string $data, int &$offset, int $info): int
     if ($info < 24) {
         return $info;
     }
-    $size = match ($info) {
-        24 => 1,
-        25 => 2,
-        26 => 4,
-        27 => 8,
-        default => fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten'),
+    [$size, $format] = match ($info) {
+        24 => [1, 'C'],
+        25 => [2, 'n'],
+        26 => [4, 'N'],
+        27 => [8, 'J'],
+        default => invalid_passkey_data(),
     };
     if ($offset + $size > strlen($data)) {
-        fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+        invalid_passkey_data();
     }
-    $bytes = substr($data, $offset, $size);
+    $value = unpack($format, substr($data, $offset, $size))[1];
     $offset += $size;
-    $value = unpack(['C', 'n', 'N', 'J'][(int) log($size, 2)], $bytes)[1];
     if ($value < 0 || $value > 0x7fffffff) {
-        fail(400, 'VALIDATION_ERROR', 'Ungültige Passkey-Daten');
+        invalid_passkey_data();
     }
     return $value;
 }

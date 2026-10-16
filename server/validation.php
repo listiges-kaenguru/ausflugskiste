@@ -60,19 +60,23 @@ function validate_username(array $body): string
     return $username;
 }
 
+/** bcrypt berücksichtigt nur die ersten 72 Bytes, deshalb die Obergrenze. */
+function password_error(string $password, string $label): ?string
+{
+    if (strlen($password) < 6) {
+        return "$label ist zu kurz";
+    }
+    return strlen($password) > 72 ? "$label ist zu lang (maximal 72 Bytes)" : null;
+}
+
 function validate_credentials(array $body): array
 {
-    $errors = [];
     $username = trim(string_field($body, 'username') ?? '');
     $password = string_field($body, 'password') ?? '';
-    if (($error = username_error($username)) !== null) {
-        $errors['username'] = $error;
-    }
-    if (strlen($password) < 6) {
-        $errors['password'] = 'Passwort ist zu kurz';
-    } elseif (strlen($password) > 72) {
-        $errors['password'] = 'Passwort ist zu lang (maximal 72 Bytes)';
-    }
+    $errors = array_filter([
+        'username' => username_error($username),
+        'password' => password_error($password, 'Passwort'),
+    ]);
     if ($errors) {
         validation_failed($errors);
     }
@@ -81,17 +85,12 @@ function validate_credentials(array $body): array
 
 function validate_change_password(array $body, bool $requireCurrent = true): array
 {
-    $errors = [];
     $current = string_field($body, 'currentPassword') ?? '';
     $new = string_field($body, 'newPassword') ?? '';
-    if ($requireCurrent && strlen($current) < 6) {
-        $errors['currentPassword'] = 'Aktuelles Passwort fehlt';
-    }
-    if (strlen($new) < 6) {
-        $errors['newPassword'] = 'Neues Passwort ist zu kurz';
-    } elseif (strlen($new) > 72) {
-        $errors['newPassword'] = 'Neues Passwort ist zu lang (maximal 72 Bytes)';
-    }
+    $errors = array_filter([
+        'currentPassword' => $requireCurrent && strlen($current) < 6 ? 'Aktuelles Passwort fehlt' : null,
+        'newPassword' => password_error($new, 'Neues Passwort'),
+    ]);
     if ($errors) {
         validation_failed($errors);
     }

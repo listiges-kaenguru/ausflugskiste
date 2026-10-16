@@ -23,15 +23,17 @@ function data_dir(): string
     if ($dir === null) {
         // Name der Variablen aus der Zeit vor der Umbenennung, damit bestehende Installationen weiterlaufen
         $path = getenv('AUSFLUGSZIELE_DATA_DIR') ?: dirname(__DIR__) . '/data';
-        // SQLite braucht Schreibrechte auf Datei und Verzeichnis (für das Journal).
-        foreach ([$path, "$path/uploads", "$path/sessions", "$path/app.db"] as $entry) {
-            $isFile = str_ends_with($entry, '.db');
-            if (!$isFile && !is_dir($entry)) {
+        foreach ([$path, "$path/uploads", "$path/sessions"] as $entry) {
+            if (!is_dir($entry)) {
                 @mkdir($entry, 0770, true);
             }
-            if (($isFile && file_exists($entry) && !is_writable($entry)) || (!$isFile && (!is_dir($entry) || !is_writable($entry)))) {
+            if (!is_dir($entry) || !is_writable($entry)) {
                 data_dir_error($entry);
             }
+        }
+        // SQLite braucht Schreibrechte auf Datei und Verzeichnis (für das Journal).
+        if (file_exists("$path/app.db") && !is_writable("$path/app.db")) {
+            data_dir_error("$path/app.db");
         }
         $dir = $path;
     }
@@ -249,6 +251,12 @@ function uuid(): string
     $bytes = random_bytes(16);
     $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
     $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+    return format_uuid($bytes);
+}
+
+/** 16 Bytes in der üblichen Schreibweise 8-4-4-4-12. */
+function format_uuid(string $bytes): string
+{
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
 }
 
@@ -262,19 +270,25 @@ function hash_password(string $password): string
     return password_hash($password, PASSWORD_BCRYPT, ['cost' => 10]);
 }
 
-/** Zufälliges, gut ablesbares Passwort wie „k7mp-x9qr-2bth-wn4e“ (ohne verwechselbare Zeichen wie l/1, o/0). */
-function generate_password(): string
+/** Zufällige, gut ablesbare Vierergruppen wie „k7mp-x9qr“ (ohne verwechselbare Zeichen wie l/1, o/0). */
+function readable_code(int $groups): string
 {
     $alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
-    $groups = [];
-    for ($group = 0; $group < 4; $group++) {
+    $chunks = [];
+    for ($group = 0; $group < $groups; $group++) {
         $chunk = '';
         for ($i = 0; $i < 4; $i++) {
             $chunk .= $alphabet[random_int(0, strlen($alphabet) - 1)];
         }
-        $groups[] = $chunk;
+        $chunks[] = $chunk;
     }
-    return implode('-', $groups);
+    return implode('-', $chunks);
+}
+
+/** Zufälliges Passwort wie „k7mp-x9qr-2bth-wn4e“. */
+function generate_password(): string
+{
+    return readable_code(4);
 }
 
 function verify_password(string $password, string $hash): bool
