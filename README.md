@@ -38,6 +38,11 @@ das Frontend ist reines HTML/CSS/JavaScript, das Backend reines PHP mit SQLite.
 
 Für den Betrieb im Internet unbedingt HTTPS verwenden.
 
+Ob eine neue Version erschienen ist, zeigt das Profil ganz unten. Dazu fragt der Server höchstens alle 12 Stunden
+das neueste Release bei der GitHub-API (`api.github.com`) ab, über cURL oder `allow_url_fopen`, und merkt sich das
+Ergebnis in `data/release.json`. Daten der Nutzer werden dabei nicht übertragen. Ist ausgehender Verkehr gesperrt,
+steht dort nur, dass die Prüfung nicht möglich war.
+
 ### Passkeys
 Benutzer können unter **Profil → Anmeldung & Sicherheit** Passkeys anlegen und sich damit ohne Passwort
 anmelden (Fingerabdruck, Gesichtserkennung, Geräte-PIN oder Passwortmanager). Das Passwort bleibt als
@@ -162,6 +167,7 @@ Binärdaten der Passkey-Endpunkte (Challenge, Schlüssel-IDs, Antworten des Brow
 | Methode | Pfad | Beschreibung |
 | --- | --- | --- |
 | GET | `me` | Angemeldeter Benutzer und ob die Ersteinrichtung aussteht |
+| GET | `version` | Installierte Version und neuestes Release auf GitHub (`installed`, `latest`, `checkedAt`) |
 | POST | `setup` | Ersten Admin anlegen (nur solange es keine Benutzer gibt) |
 | POST | `login`, `logout`, `change-password` | Anmeldung und Passwort – mit Zwei-Faktor-Anmeldung antwortet `login` mit `{ "totpRequired": true }` |
 | POST | `login/totp` | Zweiter Anmeldeschritt: `{ "code" }` – App-Code oder Wiederherstellungscode |
