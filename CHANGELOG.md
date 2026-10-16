@@ -8,6 +8,8 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+## [0.4.0] – 2026-10-16
+
 ### Hinzugefügt
 - **Zwei-Faktor-Anmeldung (TOTP):** Unter Profil → Anmeldung & Sicherheit lässt sich eine Authenticator-App
   einrichten (QR-Code, alternativ Link oder Schlüssel zum Abtippen). Danach fragt die Anmeldung mit Passwort
@@ -186,6 +188,7 @@ Erste versionierte Veröffentlichung. Die App läuft jetzt ohne npm, Framework u
 Ursprüngliche, nicht versionierte Fassung als Next.js-PWA mit Prisma, Login, Ausflugszielen, Tags und
 Bild-Upload-API (Commit [`96d0982`](https://github.com/listiges-kaenguru/ausflugsziele/commit/96d0982)).
 
+[0.4.0]: https://github.com/listiges-kaenguru/ausflugskiste/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/listiges-kaenguru/ausflugskiste/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/listiges-kaenguru/ausflugsziele/compare/v0.0.3...v0.1.0
