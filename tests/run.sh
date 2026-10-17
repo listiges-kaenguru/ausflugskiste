@@ -33,16 +33,20 @@ api() { curl -s -b "$TMP/cookies" -c "$TMP/cookies" -H 'X-Requested-With: fetch'
 # Kopie des Arbeitsstands, Server starten
 mkdir -p "$TMP/app"
 (cd "$ROOT" && git ls-files -co --exclude-standard -z | tar --null -T - -c) | tar -x -C "$TMP/app"
+# Versionsprüfung ohne Netz: frischer Cache mit fester Version, die App fragt GitHub dann nicht
+mkdir -p "$TMP/app/data"
+printf '{"version":"9.9.9","checkedAt":%s,"triedAt":%s}' "$(date +%s)" "$(date +%s)" > "$TMP/app/data/release.json"
 php -S "0.0.0.0:$PORT" -t "$TMP/app" >"$TMP/server.log" 2>&1 &
 SRV=$!
 for _ in $(seq 1 50); do curl -s -o /dev/null "$U/" && break; sleep 0.2; done
 
 pruefe "Startseite" "$(curl -s "$U/" | grep -c '<html')" '. > 0'
-pruefe "version" "$(api "$U/api.php?r=version")" 'type == "object"'
 pruefe "Einrichtung" "$(api -X POST "$U/api.php?r=setup" -d '{"username":"admin","password":"Test-Passwort-123"}')" 'type == "object" and (.error == null)'
 api -X POST "$U/api.php?r=logout" >/dev/null
 pruefe "Anmeldung" "$(api -X POST "$U/api.php?r=login" -d '{"username":"admin","password":"Test-Passwort-123"}')" '.error == null'
-pruefe "Ziele lesen" "$(api "$U/api.php?r=destinations")" 'type == "object" or type == "array"'
+pruefe "Version (aus dem Cache, ohne Netz)" "$(api "$U/api.php?r=version")" \
+  '.success == true and (.data.installed | type == "string" and length > 0) and .data.latest == "9.9.9"'
+pruefe "Ziele lesen" "$(api "$U/api.php?r=destinations")" '.success == true and (.data | type == "array")'
 
 echo "$ANZAHL Prüfungen, $FEHLER fehlgeschlagen"
 if [ "$FEHLER" -gt 0 ]; then echo "Serverprotokoll:"; tail -20 "$TMP/server.log"; fi
