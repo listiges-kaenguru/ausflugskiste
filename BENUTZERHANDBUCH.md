@@ -190,7 +190,8 @@ aktuellen Code ab.
 ### Passwort ändern
 
 Unter **Anmeldung & Sicherheit** → **Passwort ändern**: aktuelles Passwort und zweimal das neue eingeben
-(mindestens 6 Zeichen), dann **Passwort ändern**.
+(mindestens 6 Zeichen), dann **Passwort ändern**. Auf allen anderen Geräten bist du danach abgemeldet – praktisch,
+wenn jemand dein altes Passwort kennt.
 
 ### Tags
 
@@ -260,7 +261,7 @@ Knöpfe:
 
 | Knopf | Wirkung |
 |---|---|
-| **Schlüssel** – Neues Passwort | Erzeugt ein neues Passwort und zeigt es einmalig an. Das alte gilt nicht mehr, Passkeys bleiben gültig. |
+| **Schlüssel** – Neues Passwort | Erzeugt ein neues Passwort und zeigt es einmalig an. Das alte gilt nicht mehr, der Zugang wird auf allen Geräten abgemeldet; Passkeys bleiben gültig. |
 | **Fingerabdruck** – Passkeys | Zeigt die Passkeys des Zugangs; einzelne lassen sich entfernen, z. B. nach einem verlorenen Gerät. |
 | **Smartphone** – Zwei-Faktor-Anmeldung abschalten | Nur bei Zugängen mit 2FA. Danach genügt wieder das Passwort, z. B. wenn das Smartphone verloren ging und keine Wiederherstellungscodes mehr da sind. Vergewissere dich vorher, dass die Bitte wirklich von der Person kommt. |
 | **Schloss** – Sperren / Entsperren | Gesperrte Zugänge können sich nicht anmelden und werden sofort abgemeldet. Ziele und Fotos bleiben erhalten. |

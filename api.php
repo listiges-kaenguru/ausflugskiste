@@ -93,11 +93,17 @@ function current_user(): ?array
     if (!is_string($userId)) {
         return null;
     }
-    // Gesperrte Benutzer gelten als abgemeldet – bestehende Sessions enden damit sofort.
-    $stmt = db()->prepare('SELECT id, username, role, createdAt, mustChangePassword, totpSecret IS NOT NULL AS totpEnabled FROM "User" WHERE id = ? AND disabledAt IS NULL');
+    // Gesperrte Benutzer gelten als abgemeldet – bestehende Sessions enden damit sofort. Ebenso Sessions einer
+    // älteren Generation (Passwort geändert oder zurückgesetzt); Sessions von vor dem Update haben Generation 0.
+    $stmt = db()->prepare('SELECT id, username, role, createdAt, mustChangePassword, totpSecret IS NOT NULL AS totpEnabled, sessionVersion FROM "User" WHERE id = ? AND disabledAt IS NULL');
     $stmt->execute([$userId]);
     $user = $stmt->fetch();
-    return $user ? ['mustChangePassword' => (bool) $user['mustChangePassword'], 'totpEnabled' => (bool) $user['totpEnabled']] + $user : null;
+    if (!$user || (int) $user['sessionVersion'] !== (int) ($_SESSION['sessionVersion'] ?? 0)) {
+        unset($_SESSION['userId'], $_SESSION['sessionVersion']);
+        return null;
+    }
+    unset($user['sessionVersion']);
+    return ['mustChangePassword' => (bool) $user['mustChangePassword'], 'totpEnabled' => (bool) $user['totpEnabled']] + $user;
 }
 
 /** Solange ein vom Admin vergebenes Passwort nicht geändert wurde, ist nur der Passwortwechsel erlaubt. */
@@ -129,6 +135,14 @@ function sign_in(array $user): void
     session_regenerate_id(true);
     unset($_SESSION['totpLogin']);
     $_SESSION['userId'] = $user['id'];
+    $_SESSION['sessionVersion'] = session_version($user['id']);
+}
+
+function session_version(string $userId): int
+{
+    $stmt = db()->prepare('SELECT sessionVersion FROM "User" WHERE id = ?');
+    $stmt->execute([$userId]);
+    return (int) $stmt->fetchColumn();
 }
 
 function me(): never
@@ -350,8 +364,11 @@ function change_password(): never
         validation_failed(['newPassword' => 'Das neue Passwort muss sich vom bisherigen unterscheiden']);
     }
 
-    db()->prepare('UPDATE "User" SET passwordHash = ?, mustChangePassword = 0, updatedAt = ? WHERE id = ?')
+    // Andere Geräte werden abgemeldet, diese Sitzung läuft mit der neuen Generation weiter.
+    db()->prepare('UPDATE "User" SET passwordHash = ?, mustChangePassword = 0, sessionVersion = sessionVersion + 1, updatedAt = ? WHERE id = ?')
         ->execute([hash_password($input['newPassword']), now(), $user['id']]);
+    session_regenerate_id(true);
+    $_SESSION['sessionVersion'] = session_version($user['id']);
     respond(['ok' => true]);
 }
 
@@ -699,7 +716,7 @@ function reset_user_password(string $id): never
 {
     other_user($id);
     $password = generate_password();
-    db()->prepare('UPDATE "User" SET passwordHash = ?, mustChangePassword = 1, updatedAt = ? WHERE id = ?')->execute([hash_password($password), now(), $id]);
+    db()->prepare('UPDATE "User" SET passwordHash = ?, mustChangePassword = 1, sessionVersion = sessionVersion + 1, updatedAt = ? WHERE id = ?')->execute([hash_password($password), now(), $id]);
     respond(['password' => $password]);
 }
 

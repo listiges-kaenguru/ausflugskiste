@@ -8,11 +8,16 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Sicherheit
+
+- Ein Passwortwechsel meldet den Zugang auf allen anderen Geräten ab, ebenso das Zurücksetzen des Passworts durch einen Administrator. Bisher blieben andere Sitzungen angemeldet. Bestehende Datenbanken bekommen die nötige Spalte beim ersten Aufruf; laufende Sitzungen bleiben beim Update gültig.
+
 ### Intern
 
 - Tests laufen in der gemeinsamen Testumgebung (`~/projects/testumgebung/pt test`): Syntax, Einrichtung und Anmeldung mit frischer SQLite-DB.
 - API-Tests liegen jetzt im Projekt (`tests/run.sh`, Bash ohne Framework) statt zentral in der Testumgebung; `tests/` ist nicht im Release-ZIP.
 - Tests schärfer: Versions- und Ziele-Prüfung erkennen Fehlerantworten; die Versionsprüfung läuft nach der Anmeldung und ohne Netz (fester Cache statt GitHub-Abfrage).
+- Negativtests in `tests/sicherheit.sh` (226 Prüfungen): Rechte, Sitzungen, CSRF, Login-Sperre, Zwei-Faktor, Passkeys (ES256/RS256), Injection, Eingabevalidierung, Fehlermeldungen; unabhängige TOTP-Berechnung und Passkey-Simulation in `tests/`.
 
 ## [0.5.0] – 2026-10-17
 

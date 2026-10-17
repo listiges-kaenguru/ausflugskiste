@@ -4,13 +4,17 @@
 #   pt test                 mit Syntax- und Linkprüfung
 #   pt bash tests/run.sh    nur diese Tests
 #   pt offen                danach bleibt der Server unter http://localhost:8001 offen
+#   pt abdeckung            mit Zeilen-Coverage der PHP-Dateien
 # Brauchen php (mit pdo_sqlite), curl und jq. Arbeiten auf einer Kopie des Arbeitsstands (ohne ignorierte
 # Dateien wie data/app.db) in einem temporären Ordner mit frischer Datenbank; im Repo entsteht nichts.
+# PHP läuft mit eingeschalteter Fehleranzeige (ungünstigster Fall auf Webspaces): Warnungen oder Pfade in
+# Antworten fallen so in der Leck-Prüfung am Ende auf.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${TEST_PORT:-8001}"
-U="http://localhost:$PORT"
+U="http://127.0.0.1:$PORT"
+PHP_SERVER="${PHP_SERVER:-php}"   # pt abdeckung setzt hier PHP mit Xdebug
 for t in php curl jq git; do
   command -v "$t" >/dev/null || { echo "$t fehlt – in der Testumgebung ausführen: ~/projects/testumgebung/pt test" >&2; exit 2; }
 done
@@ -28,7 +32,30 @@ pruefe() {
   if echo "$2" | jq -e "$3" >/dev/null 2>&1; then echo "ok   $1"
   else echo "FAIL $1: ${2:0:300}"; FEHLER=$((FEHLER + 1)); fi
 }
-api() { curl -s -b "$TMP/cookies" -c "$TMP/cookies" -H 'X-Requested-With: fetch' -H 'Content-Type: application/json' "$@"; }
+abschnitt() { printf '\n-- %s\n' "$1"; }
+
+# Akteure: je eigener Cookie-Speicher und eigene Absenderadresse, weil die Login-Sperre je IP zählt
+declare -A IP=([test]=127.0.0.1 [gast]=127.0.0.2 [admin]=127.0.0.3 [anna]=127.0.0.4 [ben]=127.0.0.5
+  [anna2]=127.0.0.6 [sperre]=127.0.0.7 [sperre2]=127.0.0.8 [fix]=127.0.0.9 [csrf]=127.0.0.10
+  [tina]=127.0.0.11 [tina2]=127.0.0.12 [tina3]=127.0.0.13 [tina4]=127.0.0.14 [tina5]=127.0.0.15 [tina6]=127.0.0.16
+  [tina7]=127.0.0.17 [pia]=127.0.0.18 [pk]=127.0.0.19 [pk2]=127.0.0.20 [pk3]=127.0.0.21 [pk4]=127.0.0.22 [weg]=127.0.0.23 [rita]=127.0.0.24 [rolf]=127.0.0.25 [rolf2]=127.0.0.26 [upd]=127.0.0.27 [upd2]=127.0.0.28)
+LOG="$TMP/antworten.log"
+
+# als <akteur> <curl-argumente …>  → Antwort (JSON-Anfrage mit Pflicht-Header); jede Antwort landet im Protokoll
+als() {
+  local wer=$1; shift
+  local r; r="$(curl -s --interface "${IP[$wer]}" -b "$TMP/k_$wer" -c "$TMP/k_$wer" \
+    -H 'X-Requested-With: fetch' -H 'Content-Type: application/json' "$@")"
+  printf '%s\n' "$r" >> "$LOG"; printf '%s' "$r"
+}
+# status <akteur> <curl-argumente …>  → nur der HTTP-Status (Antwort trotzdem ins Protokoll)
+status() {
+  local wer=$1; shift
+  local r; r="$(curl -s --interface "${IP[$wer]}" -b "$TMP/k_$wer" -c "$TMP/k_$wer" \
+    -H 'X-Requested-With: fetch' -H 'Content-Type: application/json' -w '\n%{http_code}' "$@" | tr -d '\0')"
+  printf '%s\n' "$r" >> "$LOG"; printf '%s' "${r##*$'\n'}"
+}
+api() { als test "$@"; }
 
 # Kopie des Arbeitsstands, Server starten
 mkdir -p "$TMP/app"
@@ -36,10 +63,13 @@ mkdir -p "$TMP/app"
 # Versionsprüfung ohne Netz: frischer Cache mit fester Version, die App fragt GitHub dann nicht
 mkdir -p "$TMP/app/data"
 printf '{"version":"9.9.9","checkedAt":%s,"triedAt":%s}' "$(date +%s)" "$(date +%s)" > "$TMP/app/data/release.json"
-php -S "0.0.0.0:$PORT" -t "$TMP/app" >"$TMP/server.log" 2>&1 &
+# shellcheck disable=SC2086
+$PHP_SERVER -d display_errors=1 -d display_startup_errors=1 -d error_reporting=-1 \
+  -d upload_max_filesize=12M -d post_max_size=16M -S "0.0.0.0:$PORT" -t "$TMP/app" >"$TMP/server.log" 2>&1 &
 SRV=$!
 for _ in $(seq 1 50); do curl -s -o /dev/null "$U/" && break; sleep 0.2; done
 
+abschnitt "Grundfunktionen"
 pruefe "Startseite" "$(curl -s "$U/" | grep -c '<html')" '. > 0'
 pruefe "Einrichtung" "$(api -X POST "$U/api.php?r=setup" -d '{"username":"admin","password":"Test-Passwort-123"}')" 'type == "object" and (.error == null)'
 api -X POST "$U/api.php?r=logout" >/dev/null
@@ -48,11 +78,15 @@ pruefe "Version (aus dem Cache, ohne Netz)" "$(api "$U/api.php?r=version")" \
   '.success == true and (.data.installed | type == "string" and length > 0) and .data.latest == "9.9.9"'
 pruefe "Ziele lesen" "$(api "$U/api.php?r=destinations")" '.success == true and (.data | type == "array")'
 
+# shellcheck source=tests/sicherheit.sh
+. "$ROOT/tests/sicherheit.sh"
+
+echo
 echo "$ANZAHL Prüfungen, $FEHLER fehlgeschlagen"
 if [ "$FEHLER" -gt 0 ]; then echo "Serverprotokoll:"; tail -20 "$TMP/server.log"; fi
 
 if [ -n "${OFFEN:-}" ]; then
-  echo "Läuft: $U/ (Anmeldung admin / Test-Passwort-123) – Strg+C beendet"
+  echo "Läuft: http://localhost:$PORT/ (Anmeldung admin / Test-Passwort-123) – Strg+C beendet"
   wait "$SRV"
 fi
 [ "$FEHLER" -eq 0 ]

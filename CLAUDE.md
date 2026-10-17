@@ -25,7 +25,10 @@ Die App läuft bewusst **ohne Abhängigkeiten und ohne Build-Schritt** auf einem
 - Neue Entwicklungsdateien in `.gitattributes` als `export-ignore` eintragen (Release-ZIP nur mit Benötigtem).
 - Testen in der gemeinsamen Testumgebung, nichts lokal installieren: `~/projects/testumgebung/pt test` (Syntax, Links und
   `tests/run.sh`). Die Tests liegen in `tests/` (Bash/PHP ohne Framework, laufen auf einer Kopie mit frischer
-  SQLite-DB); neue Tests dort ergänzen. Im Browser: `~/projects/testumgebung/pt offen` (Testinstanz, http://localhost:8001) oder
+  SQLite-DB); neue Tests dort ergänzen. `tests/sicherheit.sh` enthält die Negativtests (Rechte, Sitzungen, CSRF,
+  Login-Sperre, Zwei-Faktor, Passkeys, Injection, Eingabevalidierung, Fehlermeldungen); `tests/totp-code.php` und
+  `tests/passkey-client.php` sind bewusst unabhängig vom App-Code. Jede neue Sicherheitsprüfung muss bei einer
+  passenden Sabotage der App nachweislich fehlschlagen. Coverage: `~/projects/testumgebung/pt abdeckung`. Im Browser: `~/projects/testumgebung/pt offen` (Testinstanz, http://localhost:8001) oder
   `~/projects/testumgebung/pt -p 8000 php -S 0.0.0.0:8000` für die eigene Arbeitskopie.
 
 ## Abhängige Projekte
