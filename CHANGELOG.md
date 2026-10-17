@@ -8,6 +8,10 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Intern
+
+- Tests laufen in der gemeinsamen Testumgebung (`~/projects/testumgebung/pt test`): Syntax, Einrichtung und Anmeldung mit frischer SQLite-DB.
+
 ## [0.5.0] – 2026-10-17
 
 ### Hinzugefügt

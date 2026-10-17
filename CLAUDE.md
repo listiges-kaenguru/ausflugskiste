@@ -23,7 +23,8 @@ Die App läuft bewusst **ohne Abhängigkeiten und ohne Build-Schritt** auf einem
   bestehenden Datenbanken kompatibel bleiben (Änderungen nur additiv in `migrate()`).
 - Oberfläche, Kommentare und Doku auf Deutsch; Bezeichner im Code auf Englisch.
 - Neue Entwicklungsdateien in `.gitattributes` als `export-ignore` eintragen (Release-ZIP nur mit Benötigtem).
-- Lokal testen: `php -S localhost:8000`, PHP-Syntax mit `php -l`.
+- Testen in der gemeinsamen Testumgebung, nichts lokal installieren: `~/projects/testumgebung/pt test` (Syntax, Links, API mit
+  frischer SQLite-DB). Im Browser: `~/projects/testumgebung/pt -p 8000 php -S 0.0.0.0:8000`, dann <http://localhost:8000>.
 
 ## Abhängige Projekte
 
