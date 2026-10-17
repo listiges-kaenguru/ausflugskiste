@@ -13,6 +13,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 - Tests laufen in der gemeinsamen Testumgebung (`~/projects/testumgebung/pt test`): Syntax, Einrichtung und Anmeldung mit frischer SQLite-DB.
 - API-Tests liegen jetzt im Projekt (`tests/run.sh`, Bash ohne Framework) statt zentral in der Testumgebung; `tests/` ist nicht im Release-ZIP.
 - Tests schärfer: Versions- und Ziele-Prüfung erkennen Fehlerantworten; die Versionsprüfung läuft nach der Anmeldung und ohne Netz (fester Cache statt GitHub-Abfrage).
+- Negativtests in `tests/sicherheit.sh` (215 Prüfungen): Rechte, Sitzungen, CSRF, Login-Sperre, Zwei-Faktor, Passkeys (ES256/RS256), Injection, Eingabevalidierung, Fehlermeldungen; unabhängige TOTP-Berechnung und Passkey-Simulation in `tests/`.
 
 ## [0.5.0] – 2026-10-17
 
