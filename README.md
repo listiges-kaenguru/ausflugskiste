@@ -200,6 +200,7 @@ alle, die die App nutzen, und steht auch auf <https://ausflugskiste.schmaralde.d
 - `api.php` – JSON-API
 - `server/` – PHP-Hilfsfunktionen, Validierung, Passkeys (WebAuthn), Zwei-Faktor-Anmeldung (TOTP) und Kommandozeilen-Skript
 - `data/` – Datenbank, Sessions und Uploads (wird automatisch angelegt, nicht öffentlich)
+- `tests/` – automatische Tests (`tests/run.sh`, Bash ohne Abhängigkeiten); nicht im Release-ZIP
 
 ## Mitwirken
 Hinweise zur Entwicklung und zu Beiträgen stehen in [CONTRIBUTING.md](CONTRIBUTING.md),
