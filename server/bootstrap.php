@@ -160,6 +160,10 @@ function migrate(PDO $pdo): void
     if (!in_array('mustChangePassword', $userColumns, true)) {
         $pdo->exec('ALTER TABLE "User" ADD COLUMN "mustChangePassword" BOOLEAN NOT NULL DEFAULT false');
     }
+    // Sitzungs-Generation: steigt bei Passwortwechsel und -zurücksetzen, ältere Sitzungen enden damit.
+    if (!in_array('sessionVersion', $userColumns, true)) {
+        $pdo->exec('ALTER TABLE "User" ADD COLUMN "sessionVersion" INTEGER NOT NULL DEFAULT 0');
+    }
     // Zwei-Faktor-Anmeldung: Geheimnis (Base32), zuletzt verbrauchtes Zeitfenster, Hashes der Wiederherstellungscodes (JSON).
     foreach (['totpSecret' => 'TEXT', 'totpLastStep' => 'INTEGER', 'totpRecoveryCodes' => 'TEXT'] as $column => $type) {
         if (!in_array($column, $userColumns, true)) {

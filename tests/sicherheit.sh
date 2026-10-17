@@ -111,6 +111,14 @@ als anna -X POST "${A}change-password" -d "$(json --arg p "$ANNA_PW" '{currentPa
 ANNA_PW='Anna-Passwort-2'
 pruefe "Passwortwechsel: eigene Sitzung bleibt" "$(status anna "${A}destinations")" '. == 200'
 pruefe "Passwortwechsel: andere Sitzung endet → 401" "$(status anna2 "${A}destinations")" '. == 401'
+ROLF_ID="$(als admin -X POST "${A}users" -d '{"username":"rolf","password":"Start-Rolf-1"}' | jq -r '.data.id')"
+als rolf -X POST "${A}login" -d '{"username":"rolf","password":"Start-Rolf-1"}' >/dev/null
+als rolf -X POST "${A}change-password" -d '{"newPassword":"Rolf-Passwort-1"}' >/dev/null
+als rolf2 -X POST "${A}login" -d '{"username":"rolf","password":"Rolf-Passwort-1"}' >/dev/null
+pruefe "zwei Sitzungen von Rolf aktiv" "$(json --arg a "$(status rolf "${A}destinations")" --arg b "$(status rolf2 "${A}destinations")" '[$a, $b]')" '. == ["200", "200"]'
+als admin -X POST "${A}users/$ROLF_ID/password" -d '{}' >/dev/null
+pruefe "Admin setzt Passwort zurück: erste Sitzung endet → 401" "$(status rolf "${A}destinations")" '. == 401'
+pruefe "Admin setzt Passwort zurück: zweite Sitzung endet → 401" "$(status rolf2 "${A}destinations")" '. == 401'
 
 als admin -X PUT "${A}users/$BEN_ID" -d '{"disabled":true}' >/dev/null
 pruefe "gesperrt: laufende Sitzung endet → 401" "$(status ben "${A}destinations")" '. == 401'
@@ -243,6 +251,9 @@ pruefe "falscher Code → 401" "$(als tina2 -X POST "${A}login/totp" -d "$(mit_c
 C0="$(totp "$GEHEIM" 0)"
 pruefe "richtiger Code meldet an" "$(als tina2 -X POST "${A}login/totp" -d "$(mit_code "$C0")")" '.success == true and .data.user.username == "tina"'
 pruefe "danach Zugriff" "$(status tina2 "${A}destinations")" '. == 200'
+als tina -X POST "${A}change-password" -d '{"currentPassword":"Tina-Passwort-1","newPassword":"Tina-Passwort-2"}' >/dev/null
+TINA='{"username":"tina","password":"Tina-Passwort-2"}'
+pruefe "Passwortwechsel beendet auch eine Sitzung aus der Zwei-Faktor-Anmeldung → 401" "$(status tina2 "${A}destinations")" '. == 401'
 als tina3 -X POST "${A}login" -d "$TINA" >/dev/null
 pruefe "derselbe Code ein zweites Mal → 401 (Replay)" "$(als tina3 -X POST "${A}login/totp" -d "$(mit_code "$C0")")" '.error.code == "INVALID_CODE"'
 pruefe "Wiederherstellungscode meldet an, 9 übrig" "$(als tina3 -X POST "${A}login/totp" -d "$(mit_code "$WC1")")" '.success == true and .data.recoveryCodesLeft == 9'
@@ -326,6 +337,9 @@ CH="$(login_challenge pk)"
 pruefe "Zähler gestiegen → angemeldet" "$(anmelden pk "$(pk anmelden "$TMP/pia.key" "$CH" "$U" "$RP" 5)")" '.success == true'
 CH="$(login_challenge pk)"
 pruefe "Anmeldung mit RSA-Passkey" "$(anmelden pk "$(pk anmelden "$TMP/rsa.key" "$CH" "$U" "$RP" 1)")" '.data.user.username == "pia"'
+als pia -X POST "${A}change-password" -d '{"currentPassword":"Pia-Passwort-1","newPassword":"Pia-Passwort-2"}' >/dev/null
+pruefe "Passwortwechsel beendet auch eine Passkey-Sitzung → 401" "$(status pk "${A}destinations")" '. == 401'
+pruefe "Pias eigene Sitzung bleibt" "$(status pia "${A}destinations")" '. == 200'
 CH="$(login_challenge pk2)"
 pruefe "falsche Signatur → 401" "$(anmelden pk2 "$(pk anmelden "$TMP/pia.key" "$CH" "$U" "$RP" 9 falsche-signatur)")" '.error.code == "INVALID_CREDENTIALS"'
 pruefe "nach falscher Signatur kein Zugriff" "$(status pk2 "${A}destinations")" '. == 401'
@@ -366,6 +380,31 @@ pruefe "Admin löscht Benutzer" "$(status admin -X DELETE "${A}users/$WEG_ID")" 
 pruefe "seine Bilder sind vom Server entfernt" "$(find "$TMP/app/data/uploads" -name "$DATEI.*" | wc -l)" '. == 0'
 pruefe "seine Sitzung endet → 401" "$(status weg "${A}destinations")" '. == 401'
 pruefe "Wartungsskript über das Web → 404 ohne Ausgabe" "$(curl -s -w '%{http_code}' "$U/server/cli.php?list-users")" '. == 404'
+
+# ---------------------------------------------------------------------------------------------------------
+abschnitt "Update von der letzten veröffentlichten Version"
+# Alte Version aus dem Git-Tag starten, Daten und Sitzungen anlegen, dann auf demselben Datenordner den neuen Code
+ALT_TAG="$(git -C "$ROOT" describe --tags --abbrev=0 --match 'v*' HEAD)"
+P2=$((PORT + 100)); U2="http://127.0.0.1:$P2"; A2="$U2/api.php?r="
+mkdir -p "$TMP/alt" "$TMP/daten"
+git -C "$ROOT" archive "$ALT_TAG" | tar -x -C "$TMP/alt"
+printf '{"version":"9.9.9","checkedAt":%s,"triedAt":%s}' "$(date +%s)" "$(date +%s)" > "$TMP/daten/release.json"
+AUSFLUGSZIELE_DATA_DIR="$TMP/daten" php -S "0.0.0.0:$P2" -t "$TMP/alt" >"$TMP/alt.log" 2>&1 & ALT=$!
+for _ in $(seq 1 50); do curl -s -o /dev/null "$U2/" && break; sleep 0.2; done
+als upd -X POST "${A2}setup" -d '{"username":"chef","password":"Chef-Passwort-1"}' >/dev/null
+als upd -X POST "${A2}destinations" -d '{"name":"Ziel aus der alten Version"}' >/dev/null
+als upd2 -X POST "${A2}login" -d '{"username":"chef","password":"Chef-Passwort-1"}' >/dev/null
+pruefe "alte Version $ALT_TAG läuft mit zwei Sitzungen" "$(json --arg a "$(status upd "${A2}destinations")" --arg b "$(status upd2 "${A2}destinations")" '[$a, $b]')" '. == ["200", "200"]'
+kill "$ALT"; wait "$ALT" 2>/dev/null
+# shellcheck disable=SC2086
+AUSFLUGSZIELE_DATA_DIR="$TMP/daten" $PHP_SERVER -d display_errors=1 -d error_reporting=-1 -S "0.0.0.0:$P2" -t "$TMP/app" >"$TMP/neu.log" 2>&1 & NEU=$!
+for _ in $(seq 1 50); do curl -s -o /dev/null "$U2/" && break; sleep 0.2; done
+pruefe "nach dem Update: laufende Sitzung gültig, Daten da" "$(als upd "${A2}destinations")" '.success == true and .data[0].name == "Ziel aus der alten Version"'
+als upd -X POST "${A2}change-password" -d '{"currentPassword":"Chef-Passwort-1","newPassword":"Chef-Passwort-2"}' >/dev/null
+pruefe "nach dem Update: eigene Sitzung bleibt nach Passwortwechsel" "$(status upd "${A2}destinations")" '. == 200'
+pruefe "nach dem Update: Passwortwechsel beendet Sitzung von vor dem Update → 401" "$(status upd2 "${A2}destinations")" '. == 401'
+pruefe "nach dem Update: keine PHP-Warnungen" "$(grep -E -c 'PHP (Warning|Notice|Deprecated|Fatal)' "$TMP/neu.log")" '. == 0'
+kill "$NEU"; wait "$NEU" 2>/dev/null
 
 # ---------------------------------------------------------------------------------------------------------
 abschnitt "Fehlermeldungen ohne interne Details"

@@ -8,6 +8,10 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Sicherheit
+
+- Ein Passwortwechsel meldet den Zugang auf allen anderen Geräten ab, ebenso das Zurücksetzen des Passworts durch einen Administrator. Bisher blieben andere Sitzungen angemeldet. Bestehende Datenbanken bekommen die nötige Spalte beim ersten Aufruf; laufende Sitzungen bleiben beim Update gültig.
+
 ### Intern
 
 - Tests laufen in der gemeinsamen Testumgebung (`~/projects/testumgebung/pt test`): Syntax, Einrichtung und Anmeldung mit frischer SQLite-DB.
