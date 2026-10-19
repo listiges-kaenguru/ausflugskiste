@@ -67,3 +67,16 @@ pruefe "gesperrter Admin zählt nicht: zweiten löschen abgewiesen" "$(cli --ein
 pruefe "gesperrten Admin löschen erlaubt" "$(cli --eingabe $'ja\n' delete-user chefin)" '.code == 0'
 pruefe "chef2 aktiv, chefin gelöscht" "$(cli list-users)" '(.out | test("chef2\tADMIN\t[^\t\n]*\n")) and (.out | test("chefin") | not)'
 unset AUSFLUGSZIELE_DATA_DIR
+
+# ---------------------------------------------------------------------------------------------------------
+abschnitt "CLI: Zwei-Faktor-Anmeldung abschalten"
+cli create-user dora Dora-Passwort-1 >/dev/null
+anmelden cli dora Dora-Passwort-1 >/dev/null
+GEHEIM_D="$(als cli -X POST "${A}totp/setup" -d '{}' | jq -r '.data.secret')"
+als cli -X POST "${A}totp" -d "$(json --arg c "$(totp "$GEHEIM_D")" '{code: $c}')" >/dev/null
+MIT_2FA=dora
+pruefe "dora hat 2FA" "$(cli list-users)" '.out | test("dora\tUSER\t[^\n]*\t2FA")'
+pruefe "disable-totp $MIT_2FA" "$(cli disable-totp "$MIT_2FA")" '.code == 0 and (.out | test("für .+ abgeschaltet"))'
+pruefe "danach ohne 2FA" "$(cli list-users | jq --arg n "$MIT_2FA" '.out | split("\n") | map(select(startswith($n + "\t") and test("\t2FA"))) | length')" '. == 0'
+pruefe "disable-totp unbekannter Benutzer → Fehler" "$(cli disable-totp niemand)" '.code == 1 and (.err | test("nicht gefunden"))'
+pruefe "disable-totp ohne Benutzername → Fehler" "$(cli disable-totp)" '.code == 1 and (.err | test("fehlt"))'

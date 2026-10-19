@@ -16,7 +16,7 @@ security_headers();
 
 try {
     $method = $_SERVER['REQUEST_METHOD'];
-    $segments = array_values(array_filter(explode('/', (string) ($_GET['r'] ?? '')), 'strlen'));
+    $segments = array_values(array_filter(explode('/', (string) ($_GET['r'] ?? '')), fn (string $part): bool => $part !== ''));
     $resource = $segments[0] ?? '';
     $id = $segments[1] ?? null;
     $action = $segments[2] ?? null;

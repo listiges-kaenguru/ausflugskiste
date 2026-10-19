@@ -83,10 +83,10 @@ switch ($command) {
         break;
 
     case 'disable-totp':
-        $userId = cli_user_id($argv[2] ?? '');
+        $user = cli_user($argv[2] ?? '');
         db()->prepare('UPDATE "User" SET totpSecret = NULL, totpLastStep = NULL, totpRecoveryCodes = NULL, updatedAt = ? WHERE id = ?')
-            ->execute([now(), $userId]);
-        echo "Zwei-Faktor-Anmeldung für {$argv[2]} abgeschaltet.\n";
+            ->execute([now(), $user['id']]);
+        echo "Zwei-Faktor-Anmeldung für {$user['username']} abgeschaltet.\n";
         break;
 
     case 'lock-user':

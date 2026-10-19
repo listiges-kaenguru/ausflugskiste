@@ -20,7 +20,8 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 ### Intern
 
 - Browsertest der Oberfläche (`tests/oberflaeche.cjs`, Playwright aus der Testumgebung) prüft das Profil.
-- Tests der Kommandozeile in `tests/cli.sh`; API und Kommandozeile löschen Benutzer über dieselbe Funktion.
+- Tests der Kommandozeile in `tests/cli.sh` (auch `disable-totp`); API und Kommandozeile löschen Benutzer über dieselbe Funktion.
+- PHPStan ohne Funde: Routen-Filter ohne `strlen`-Callback, `disable-totp` nennt den Benutzer aus der Datenbank.
 
 ## [0.5.1] – 2026-10-18
 
