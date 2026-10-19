@@ -184,6 +184,7 @@ Binärdaten der Passkey-Endpunkte (Challenge, Schlüssel-IDs, Antworten des Brow
 | POST | `passkeys/options` | Optionen zum Anlegen eines Passkeys |
 | PUT/DELETE | `passkeys/<id>` | Passkey umbenennen / entfernen |
 | GET/POST | `destinations` | Ziele auflisten (Filter: `search`, `favorite`, `visited`, `minRating` (1–5), `tag[]` – mehrfach angebbar, Treffer haben alle Tags) / anlegen |
+| GET | `destinations/export` | Alle eigenen Ziele als JSON-Datei (`format`, `formatVersion`, `appVersion`, `exportedAt`, `username`, `destinations` mit Tag-Namen und Foto-Angaben ohne Bilddaten) |
 | GET/PUT/DELETE | `destinations/<id>` | Ziel lesen / ändern (alle Felder) / löschen |
 | PATCH | `destinations/<id>` | Nur Favorit/Besucht setzen: `{ "favorite": true }`, `{ "visited": false }` oder beides; andere Felder → 400 |
 | GET/POST | `tags` | Tags auflisten / anlegen |

@@ -2062,6 +2062,13 @@ async function profilePage() {
       totpSection(totp),
       h("details", { class: "disclosure" }, h("summary", null, h("span", { class: "row" }, icon("lock", "sm"), "Passwort ändern"), icon("down", "sm")), passwordForm),
     ),
+    h(
+      "section",
+      { class: "card" },
+      sectionTitle("download", "Deine Daten"),
+      h("p", { class: "muted small" }, "Alle deine Ziele mit Notizen und Tags als Datei, z. B. als Sicherung. Fotos sind nicht enthalten."),
+      h("div", null, h("a", { href: "api.php?r=destinations/export", download: "", class: "btn secondary" }, icon("download", "sm"), "Ziele exportieren")),
+    ),
     tagSection,
     isAdmin ? usersCard(users) : null,
     appFooter(),

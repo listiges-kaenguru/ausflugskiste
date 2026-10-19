@@ -39,7 +39,8 @@ declare -A IP=([test]=127.0.0.1 [gast]=127.0.0.2 [admin]=127.0.0.3 [anna]=127.0.
   [anna2]=127.0.0.6 [sperre]=127.0.0.7 [sperre2]=127.0.0.8 [fix]=127.0.0.9 [csrf]=127.0.0.10
   [tina]=127.0.0.11 [tina2]=127.0.0.12 [tina3]=127.0.0.13 [tina4]=127.0.0.14 [tina5]=127.0.0.15 [tina6]=127.0.0.16
   [tina7]=127.0.0.17 [pia]=127.0.0.18 [pk]=127.0.0.19 [pk2]=127.0.0.20 [pk3]=127.0.0.21 [pk4]=127.0.0.22 [weg]=127.0.0.23 [rita]=127.0.0.24 [rolf]=127.0.0.25 [rolf2]=127.0.0.26 [upd]=127.0.0.27 [upd2]=127.0.0.28
-  [cli]=127.0.0.29 [cli2]=127.0.0.30 [otto]=127.0.0.31)
+  [cli]=127.0.0.29 [cli2]=127.0.0.30 [otto]=127.0.0.31
+  [xaver]=127.0.0.35 [yvonne]=127.0.0.36 [zoe]=127.0.0.37)
 LOG="$TMP/antworten.log"
 
 # als <akteur> <curl-argumente …>  → Antwort (JSON-Anfrage mit Pflicht-Header); jede Antwort landet im Protokoll
@@ -98,6 +99,8 @@ OBERFLAECHE="$(node "$ROOT/tests/oberflaeche.cjs" "$U" "$SITZUNG" 2>&1)"
 pruefe "Profil lädt ohne Skriptfehler" "$OBERFLAECHE" '.profileLoaded == true and .errors == []'
 pruefe "Profil ohne „null“/„undefined“ im Text (Zwei-Faktor aus)" "$OBERFLAECHE" '.profileNull == 0'
 pruefe "Profil: Knopf „Einrichten“ für Zwei-Faktor" "$OBERFLAECHE" '.totpSetupButton == 1'
+pruefe "Profil: „Ziele exportieren“ lädt die eigenen Ziele als Datei" "$OBERFLAECHE" \
+  '.exportDownload.format == "ausflugskiste-export" and (.exportDownload.filename | test("^ausflugskiste-admin-[0-9-]{10}\\.json$")) and (.exportDownload.names | index("Patch-Ziel") != null)'
 pruefe "Umschalter Favorit sendet PATCH nur mit favorite" "$OBERFLAECHE" '.toggleRequest.method == "PATCH" and .toggleRequest.body == {"favorite": true}'
 # Profil mit aktiver Zwei-Faktor-Anmeldung: eigener Benutzer, damit admin für die weiteren Tests ohne Code bleibt
 api -X POST "$U/api.php?r=users" -d '{"username":"otto","password":"Start-Otto-1"}' >/dev/null
@@ -114,6 +117,8 @@ pruefe "Umschalter: Favorit danach gespeichert" "$(api "$U/api.php?r=destination
 . "$ROOT/tests/sicherheit.sh"
 # shellcheck source=tests/cli.sh
 . "$ROOT/tests/cli.sh"
+# shellcheck source=tests/export.sh
+. "$ROOT/tests/export.sh"
 
 echo
 echo "$ANZAHL Prüfungen, $FEHLER fehlgeschlagen"

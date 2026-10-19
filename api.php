@@ -54,6 +54,7 @@ try {
 
         $resource === 'destinations' && $id === null && $method === 'GET' => list_destinations(),
         $resource === 'destinations' && $id === null && $method === 'POST' => create_destination(),
+        $resource === 'destinations' && $id === 'export' && $action === null && $method === 'GET' => export_destinations(),
         $resource === 'destinations' && $id !== null && $method === 'GET' => respond(load_destination(own_destination($id))),
         $resource === 'destinations' && $id !== null && $method === 'PUT' => update_destination($id),
         $resource === 'destinations' && $id !== null && $method === 'PATCH' => update_destination_flags($id),
@@ -885,6 +886,34 @@ function create_destination(): never
     db()->commit();
 
     respond(load_destination(own_destination($id)), 201);
+}
+
+/** Alle eigenen Ziele als JSON-Datei, z. B. als Sicherung. Fotos nur als Angaben, ohne Bilddaten. */
+function export_destinations(): never
+{
+    $user = require_user();
+    $stmt = db()->prepare('SELECT * FROM "Destination" WHERE createdBy = ? AND deletedAt IS NULL ORDER BY createdAt');
+    $stmt->execute([$user['id']]);
+    $destinations = array_map(function (array $destination): array {
+        $destination['tags'] = array_column($destination['tags'], 'name');
+        $destination['images'] = array_map(fn (array $image): array => array_diff_key($image, ['url' => 0, 'destinationId' => 0]), $destination['images']);
+        return $destination;
+    }, load_destinations($stmt->fetchAll()));
+
+    $exportedAt = now();
+    // Nur unverfängliche Zeichen im Dateinamen: der Benutzername darf Anführungszeichen, Umbrüche usw. enthalten
+    $safeName = trim((string) preg_replace('/[^A-Za-z0-9_-]+/', '_', $user['username']), '_') ?: 'export';
+    header('Content-Type: application/json; charset=utf-8');
+    header('Content-Disposition: attachment; filename="ausflugskiste-' . $safeName . '-' . substr($exportedAt, 0, 10) . '.json"');
+    echo json_encode([
+        'format' => 'ausflugskiste-export',
+        'formatVersion' => 1,
+        'appVersion' => APP_VERSION,
+        'exportedAt' => $exportedAt,
+        'username' => $user['username'],
+        'destinations' => $destinations,
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    exit;
 }
 
 function update_destination(string $id): never
