@@ -78,6 +78,13 @@ pruefe "Version (aus dem Cache, ohne Netz)" "$(api "$U/api.php?r=version")" \
   '.success == true and (.data.installed | type == "string" and length > 0) and .data.latest == "9.9.9"'
 pruefe "Ziele lesen" "$(api "$U/api.php?r=destinations")" '.success == true and (.data | type == "array")'
 
+abschnitt "Oberfläche im Browser (Playwright)"
+SITZUNG="$(awk '$6 == "session" { print $7 }' "$TMP/k_test")"
+OBERFLAECHE="$(node "$ROOT/tests/oberflaeche.cjs" "$U" "$SITZUNG" 2>&1)"
+pruefe "Profil lädt ohne Skriptfehler" "$OBERFLAECHE" '.profileLoaded == true and .errors == []'
+pruefe "Profil ohne „null“/„undefined“ im Text (Zwei-Faktor aus)" "$OBERFLAECHE" '.profileNull == 0'
+pruefe "Profil: Knopf „Einrichten“ für Zwei-Faktor" "$OBERFLAECHE" '.totpSetupButton == 1'
+
 # shellcheck source=tests/sicherheit.sh
 . "$ROOT/tests/sicherheit.sh"
 

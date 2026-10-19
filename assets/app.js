@@ -568,7 +568,8 @@ function totpSection(status) {
 
   function render() {
     const low = status.enabled && status.recoveryCodesLeft <= 3;
-    container.replaceChildren(
+    // replaceChildren macht aus null den Text „null“ – bedingte Teile vorher herausfiltern
+    container.replaceChildren(...[
       h(
         "div",
         { class: "card-header" },
@@ -601,7 +602,7 @@ function totpSection(status) {
             ]
           : session.totp ? h("button", { type: "button", class: "btn secondary", onclick: enable }, icon("smartphone", "sm"), "Einrichten") : null,
       ),
-    );
+    ].filter(Boolean));
   }
 
   function enable(event) {

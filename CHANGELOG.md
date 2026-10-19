@@ -8,6 +8,14 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Behoben
+
+- Im Profil stand unter „Zwei-Faktor-Anmeldung“ „nullnull“, solange sie nicht eingerichtet war.
+
+### Intern
+
+- Browsertest der Oberfläche (`tests/oberflaeche.cjs`, Playwright aus der Testumgebung) prüft das Profil.
+
 ## [0.5.1] – 2026-10-18
 
 Sicherheitskorrektur: Ein Passwortwechsel beendet die Sitzungen auf anderen Geräten.
