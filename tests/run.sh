@@ -39,7 +39,7 @@ declare -A IP=([test]=127.0.0.1 [gast]=127.0.0.2 [admin]=127.0.0.3 [anna]=127.0.
   [anna2]=127.0.0.6 [sperre]=127.0.0.7 [sperre2]=127.0.0.8 [fix]=127.0.0.9 [csrf]=127.0.0.10
   [tina]=127.0.0.11 [tina2]=127.0.0.12 [tina3]=127.0.0.13 [tina4]=127.0.0.14 [tina5]=127.0.0.15 [tina6]=127.0.0.16
   [tina7]=127.0.0.17 [pia]=127.0.0.18 [pk]=127.0.0.19 [pk2]=127.0.0.20 [pk3]=127.0.0.21 [pk4]=127.0.0.22 [weg]=127.0.0.23 [rita]=127.0.0.24 [rolf]=127.0.0.25 [rolf2]=127.0.0.26 [upd]=127.0.0.27 [upd2]=127.0.0.28
-  [cli]=127.0.0.29 [cli2]=127.0.0.30)
+  [cli]=127.0.0.29 [cli2]=127.0.0.30 [otto]=127.0.0.31)
 LOG="$TMP/antworten.log"
 
 # als <akteur> <curl-argumente …>  → Antwort (JSON-Anfrage mit Pflicht-Header); jede Antwort landet im Protokoll
@@ -99,6 +99,15 @@ pruefe "Profil lädt ohne Skriptfehler" "$OBERFLAECHE" '.profileLoaded == true a
 pruefe "Profil ohne „null“/„undefined“ im Text (Zwei-Faktor aus)" "$OBERFLAECHE" '.profileNull == 0'
 pruefe "Profil: Knopf „Einrichten“ für Zwei-Faktor" "$OBERFLAECHE" '.totpSetupButton == 1'
 pruefe "Umschalter Favorit sendet PATCH nur mit favorite" "$OBERFLAECHE" '.toggleRequest.method == "PATCH" and .toggleRequest.body == {"favorite": true}'
+# Profil mit aktiver Zwei-Faktor-Anmeldung: eigener Benutzer, damit admin für die weiteren Tests ohne Code bleibt
+api -X POST "$U/api.php?r=users" -d '{"username":"otto","password":"Start-Otto-1"}' >/dev/null
+als otto -X POST "$U/api.php?r=login" -d '{"username":"otto","password":"Start-Otto-1"}' >/dev/null
+als otto -X POST "$U/api.php?r=change-password" -d '{"newPassword":"Otto-Passwort-1"}' >/dev/null
+GEHEIM_O="$(als otto -X POST "$U/api.php?r=totp/setup" -d '{}' | jq -r '.data.secret')"
+als otto -X POST "$U/api.php?r=totp" -d "{\"code\":\"$(php "$ROOT/tests/totp-code.php" "$GEHEIM_O")\"}" >/dev/null
+OBERFLAECHE_2FA="$(node "$ROOT/tests/oberflaeche.cjs" "$U" "$(awk '$6 == "session" { print $7 }' "$TMP/k_otto")" nur-profil 2>&1)"
+pruefe "Profil mit aktiver Zwei-Faktor-Anmeldung lädt" "$OBERFLAECHE_2FA" '.profileLoaded == true and .totpActive == 1 and .errors == []'
+pruefe "Profil ohne „null“/„undefined“ im Text (Zwei-Faktor aktiv)" "$OBERFLAECHE_2FA" '.profileNull == 0'
 pruefe "Umschalter: Favorit danach gespeichert" "$(api "$U/api.php?r=destinations/$DP")" '.data.favorite == true and .data.name == "Patch-Ziel"'
 
 # shellcheck source=tests/sicherheit.sh

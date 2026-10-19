@@ -1,5 +1,5 @@
 // Browsertest der Oberfläche (Playwright aus der Testumgebung, ohne node_modules im Projekt).
-// Wird von tests/run.sh aufgerufen: node tests/oberflaeche.cjs <basis-url> <session-cookie>
+// Wird von tests/run.sh aufgerufen: node tests/oberflaeche.cjs <basis-url> <session-cookie> [nur-profil]
 // Gibt ein JSON-Objekt mit den Befunden aus, die run.sh mit pruefe auswertet.
 "use strict";
 
@@ -7,7 +7,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 const { chromium } = require(path.join(execSync("npm root -g").toString().trim(), "playwright"));
 
-const [base, session] = process.argv.slice(2);
+const [base, session, mode] = process.argv.slice(2);
 
 (async () => {
   const browser = await chromium.launch();
@@ -20,22 +20,13 @@ const [base, session] = process.argv.slice(2);
     page.on("pageerror", (error) => errors.push(error.message));
 
     await page.goto(`${base}/#/profile`);
-    await page.getByText("Zwei-Faktor-Anmeldung", { exact: true }).waitFor({ timeout: 10000 });
+    await page.locator("strong", { hasText: "Zwei-Faktor-Anmeldung" }).waitFor({ timeout: 10000 });
     const text = await page.locator("#app").innerText();
     result.profileLoaded = true;
     result.profileNull = (text.match(/null|undefined/g) || []).length;
     result.totpSetupButton = await page.getByRole("button", { name: "Einrichten" }).count();
-
-    // Umschalter Favorit auf der Karte: welche Anfrage geht raus?
-    await page.goto(`${base}/#/`);
-    const toggle = page.getByRole("button", { name: "Favorit: Patch-Ziel" });
-    await toggle.waitFor({ timeout: 10000 });
-    const [request] = await Promise.all([
-      page.waitForRequest((r) => (new URL(r.url()).searchParams.get("r") ?? "").startsWith("destinations/") && r.method() !== "GET"),
-      toggle.click(),
-    ]);
-    await request.response();
-    result.toggleRequest = { method: request.method(), body: request.postDataJSON() };
+    result.totpActive = await page.getByText("Aktiv", { exact: true }).count();
+    if (mode !== "nur-profil") await toggleTest(page, result);
     result.errors = errors;
   } catch (error) {
     result.failure = error.message.split("\n")[0];
@@ -44,3 +35,16 @@ const [base, session] = process.argv.slice(2);
   }
   console.log(JSON.stringify(result));
 })();
+
+// Umschalter Favorit auf der Karte: welche Anfrage geht raus?
+async function toggleTest(page, result) {
+  await page.goto(`${base}/#/`);
+  const toggle = page.getByRole("button", { name: "Favorit: Patch-Ziel" });
+  await toggle.waitFor({ timeout: 10000 });
+  const [request] = await Promise.all([
+    page.waitForRequest((r) => (new URL(r.url()).searchParams.get("r") ?? "").startsWith("destinations/") && r.method() !== "GET"),
+    toggle.click(),
+  ]);
+  await request.response();
+  result.toggleRequest = { method: request.method(), body: request.postDataJSON() };
+}

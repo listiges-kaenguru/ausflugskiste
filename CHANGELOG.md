@@ -15,7 +15,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ### Behoben
 
-- Im Profil stand unter „Zwei-Faktor-Anmeldung“ „nullnull“, solange sie nicht eingerichtet war.
+- Im Profil stand unter „Zwei-Faktor-Anmeldung“ „nullnull“, solange sie nicht eingerichtet war, bei aktiver Zwei-Faktor-Anmeldung „null“.
 
 ### Intern
 
