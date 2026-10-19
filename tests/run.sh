@@ -38,7 +38,8 @@ abschnitt() { printf '\n-- %s\n' "$1"; }
 declare -A IP=([test]=127.0.0.1 [gast]=127.0.0.2 [admin]=127.0.0.3 [anna]=127.0.0.4 [ben]=127.0.0.5
   [anna2]=127.0.0.6 [sperre]=127.0.0.7 [sperre2]=127.0.0.8 [fix]=127.0.0.9 [csrf]=127.0.0.10
   [tina]=127.0.0.11 [tina2]=127.0.0.12 [tina3]=127.0.0.13 [tina4]=127.0.0.14 [tina5]=127.0.0.15 [tina6]=127.0.0.16
-  [tina7]=127.0.0.17 [pia]=127.0.0.18 [pk]=127.0.0.19 [pk2]=127.0.0.20 [pk3]=127.0.0.21 [pk4]=127.0.0.22 [weg]=127.0.0.23 [rita]=127.0.0.24 [rolf]=127.0.0.25 [rolf2]=127.0.0.26 [upd]=127.0.0.27 [upd2]=127.0.0.28)
+  [tina7]=127.0.0.17 [pia]=127.0.0.18 [pk]=127.0.0.19 [pk2]=127.0.0.20 [pk3]=127.0.0.21 [pk4]=127.0.0.22 [weg]=127.0.0.23 [rita]=127.0.0.24 [rolf]=127.0.0.25 [rolf2]=127.0.0.26 [upd]=127.0.0.27 [upd2]=127.0.0.28
+  [cli]=127.0.0.29 [cli2]=127.0.0.30)
 LOG="$TMP/antworten.log"
 
 # als <akteur> <curl-argumente …>  → Antwort (JSON-Anfrage mit Pflicht-Header); jede Antwort landet im Protokoll
@@ -87,6 +88,8 @@ pruefe "Profil: Knopf „Einrichten“ für Zwei-Faktor" "$OBERFLAECHE" '.totpSe
 
 # shellcheck source=tests/sicherheit.sh
 . "$ROOT/tests/sicherheit.sh"
+# shellcheck source=tests/cli.sh
+. "$ROOT/tests/cli.sh"
 
 echo
 echo "$ANZAHL Prüfungen, $FEHLER fehlgeschlagen"

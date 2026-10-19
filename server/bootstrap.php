@@ -274,6 +274,24 @@ function hash_password(string $password): string
     return password_hash($password, PASSWORD_BCRYPT, ['cost' => 10]);
 }
 
+function image_path(string $filename): string
+{
+    return data_dir() . '/uploads/' . basename($filename);
+}
+
+/** Löscht den Benutzer samt Zielen, Fotos und Passkeys (Fremdschlüssel mit ON DELETE CASCADE, Fotodateien hier). */
+function delete_user_account(string $id): void
+{
+    $stmt = db()->prepare('SELECT i.filename FROM "DestinationImage" i JOIN "Destination" d ON d.id = i.destinationId WHERE d.createdBy = ?');
+    $stmt->execute([$id]);
+    $files = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    db()->prepare('DELETE FROM "User" WHERE id = ?')->execute([$id]);
+    foreach ($files as $filename) {
+        @unlink(image_path($filename));
+    }
+}
+
 /** Zufällige, gut ablesbare Vierergruppen wie „k7mp-x9qr“ (ohne verwechselbare Zeichen wie l/1, o/0). */
 function readable_code(int $groups): string
 {

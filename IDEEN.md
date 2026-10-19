@@ -28,4 +28,3 @@ Ziele (einzeln oder eine ganze Kategorie) mit anderen Benutzern teilen.
 - **Export/Import**: Ziele als JSON/CSV oder GPX exportieren – auch als Backup pro Benutzer.
 - **Paginierung**: Die Zielliste lädt derzeit alles auf einmal und filtert im Browser – bei sehr vielen Zielen seitenweise laden und wieder serverseitig filtern (die API-Parameter dafür gibt es).
 - **Schlanker Endpunkt für Favorit/Besucht**: Die Umschalter auf den Karten senden derzeit per `PUT` alle Felder; ein `PATCH destinations/<id>` würde reichen.
-- **Benutzerverwaltung per CLI**: `lock-user`, `unlock-user`, `delete-user` in `server/cli.php`.

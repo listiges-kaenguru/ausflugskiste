@@ -6,6 +6,9 @@
 //   php server/cli.php list-passkeys <benutzername>
 //   php server/cli.php delete-passkeys <benutzername> [<passkey-id>]   (ohne ID: alle)
 //   php server/cli.php disable-totp <benutzername>   (Zwei-Faktor-Anmeldung abschalten, z. B. nach Handyverlust)
+//   php server/cli.php lock-user <benutzername>      (sperren, beendet laufende Sitzungen)
+//   php server/cli.php unlock-user <benutzername>
+//   php server/cli.php delete-user <benutzername>    (samt Zielen und Fotos, mit Rückfrage)
 //   php server/cli.php seed-demo        (nur für die lokale Entwicklung, gibt zufällige Passwörter aus)
 
 declare(strict_types=1);
@@ -86,13 +89,50 @@ switch ($command) {
         echo "Zwei-Faktor-Anmeldung für {$argv[2]} abgeschaltet.\n";
         break;
 
+    case 'lock-user':
+        $user = cli_user($argv[2] ?? '');
+        if ($user['disabledAt'] !== null) {
+            echo "Benutzer {$user['username']} ist bereits gesperrt.\n";
+            break;
+        }
+        cli_keep_last_admin($user, 'gesperrt');
+        db()->prepare('UPDATE "User" SET disabledAt = ?, updatedAt = ? WHERE id = ?')->execute([now(), now(), $user['id']]);
+        echo "Benutzer {$user['username']} gesperrt.\n";
+        break;
+
+    case 'unlock-user':
+        $user = cli_user($argv[2] ?? '');
+        if ($user['disabledAt'] === null) {
+            echo "Benutzer {$user['username']} ist nicht gesperrt.\n";
+            break;
+        }
+        db()->prepare('UPDATE "User" SET disabledAt = NULL, updatedAt = ? WHERE id = ?')->execute([now(), $user['id']]);
+        echo "Benutzer {$user['username']} entsperrt.\n";
+        break;
+
+    case 'delete-user':
+        $user = cli_user($argv[2] ?? '');
+        cli_keep_last_admin($user, 'gelöscht');
+        $stmt = db()->prepare('SELECT COUNT(*) FROM "Destination" WHERE createdBy = ? AND deletedAt IS NULL');
+        $stmt->execute([$user['id']]);
+        $count = (int) $stmt->fetchColumn();
+        echo "Benutzer {$user['username']} mit $count " . ($count === 1 ? 'Ziel' : 'Ziele') . " und allen Fotos endgültig löschen?\n";
+        echo 'Zum Bestätigen „ja“ eingeben: ';
+        if (trim((string) fgets(STDIN)) !== 'ja') {
+            echo "\nAbgebrochen.\n";
+            exit(1);
+        }
+        delete_user_account($user['id']);
+        echo "Benutzer {$user['username']} gelöscht.\n";
+        break;
+
     case 'seed-demo':
         seed_demo();
         echo "Demo-Daten angelegt.\n";
         break;
 
     default:
-        echo "Befehle: create-user, set-password, list-users, list-passkeys, delete-passkeys, disable-totp, seed-demo\n";
+        echo "Befehle: create-user, set-password, list-users, list-passkeys, delete-passkeys, disable-totp, lock-user, unlock-user, delete-user, seed-demo\n";
         exit(1);
 }
 
@@ -105,12 +145,38 @@ function find_user_id(string $username): ?string
 
 function cli_user_id(string $username): string
 {
-    $id = find_user_id($username);
-    if ($id === null) {
+    return cli_user($username)['id'];
+}
+
+/** Benutzer zum Namen oder Abbruch mit Fehlermeldung. */
+function cli_user(string $username): array
+{
+    if ($username === '') {
+        fwrite(STDERR, "Benutzername fehlt.\n");
+        exit(1);
+    }
+    $stmt = db()->prepare('SELECT id, username, role, disabledAt FROM "User" WHERE username = ?');
+    $stmt->execute([$username]);
+    $user = $stmt->fetch();
+    if (!$user) {
         fwrite(STDERR, "Benutzer $username nicht gefunden.\n");
         exit(1);
     }
-    return $id;
+    return $user;
+}
+
+/** Bricht ab, wenn der Benutzer der letzte aktive Admin ist – sonst käme niemand mehr in die Verwaltung. */
+function cli_keep_last_admin(array $user, string $what): void
+{
+    if ($user['role'] !== 'ADMIN' || $user['disabledAt'] !== null) {
+        return;
+    }
+    $others = db()->prepare('SELECT COUNT(*) FROM "User" WHERE role = \'ADMIN\' AND disabledAt IS NULL AND id <> ?');
+    $others->execute([$user['id']]);
+    if ((int) $others->fetchColumn() === 0) {
+        fwrite(STDERR, "{$user['username']} ist der letzte aktive Admin und kann nicht $what werden. Zuerst einen weiteren Admin anlegen.\n");
+        exit(1);
+    }
 }
 
 function cli_insert_user(string $username, string $password, string $role): string

@@ -8,6 +8,10 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+
+- Kommandozeile: `lock-user`, `unlock-user` und `delete-user` (samt Zielen und Fotos, mit Rückfrage). Den letzten aktiven Admin sperren oder löschen sie nicht.
+
 ### Behoben
 
 - Im Profil stand unter „Zwei-Faktor-Anmeldung“ „nullnull“, solange sie nicht eingerichtet war.
@@ -15,6 +19,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 ### Intern
 
 - Browsertest der Oberfläche (`tests/oberflaeche.cjs`, Playwright aus der Testumgebung) prüft das Profil.
+- Tests der Kommandozeile in `tests/cli.sh`; API und Kommandozeile löschen Benutzer über dieselbe Funktion.
 
 ## [0.5.1] – 2026-10-18
 

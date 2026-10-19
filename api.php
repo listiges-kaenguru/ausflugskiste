@@ -746,18 +746,11 @@ function reset_user_totp(string $id): never
     respond(['ok' => true]);
 }
 
-/** Löscht den Benutzer samt Zielen, Fotos und Passkeys (Fremdschlüssel mit ON DELETE CASCADE). */
+/** Löscht den Benutzer samt Zielen, Fotos und Passkeys. */
 function delete_user(string $id): never
 {
     other_user($id);
-    $stmt = db()->prepare('SELECT i.filename FROM "DestinationImage" i JOIN "Destination" d ON d.id = i.destinationId WHERE d.createdBy = ?');
-    $stmt->execute([$id]);
-    $files = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    db()->prepare('DELETE FROM "User" WHERE id = ?')->execute([$id]);
-    foreach ($files as $filename) {
-        @unlink(image_path($filename));
-    }
+    delete_user_account($id);
     respond(['ok' => true]);
 }
 
@@ -1032,11 +1025,6 @@ function own_image(string $id): array
     $stmt = db()->prepare('SELECT i.* FROM "DestinationImage" i JOIN "Destination" d ON d.id = i.destinationId WHERE i.id = ? AND d.createdBy = ?');
     $stmt->execute([$id, $user['id']]);
     return $stmt->fetch() ?: fail(404, 'NOT_FOUND', 'Bild nicht gefunden');
-}
-
-function image_path(string $filename): string
-{
-    return data_dir() . '/uploads/' . basename($filename);
 }
 
 function image_url(string $id): string

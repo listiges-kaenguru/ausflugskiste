@@ -142,7 +142,12 @@ php server/cli.php set-password <name> <passwort>
 php server/cli.php list-passkeys <name>
 php server/cli.php delete-passkeys <name> [<passkey-id>]   # ohne ID: alle Passkeys des Benutzers
 php server/cli.php disable-totp <name>                      # Zwei-Faktor-Anmeldung abschalten
+php server/cli.php lock-user <name>                         # sperren, laufende Sitzungen enden sofort
+php server/cli.php unlock-user <name>                       # Sperre aufheben
+php server/cli.php delete-user <name>                       # samt Zielen und Fotos, fragt vorher nach („ja“)
 ```
+Den letzten aktiven Admin sperren oder löschen `lock-user` und `delete-user` nicht – vorher einen weiteren Admin
+anlegen.
 
 ## Backup & Restore
 Alle Daten liegen in `data/`:
