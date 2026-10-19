@@ -341,7 +341,11 @@ CH="$(reg_challenge pia)"
 CD="$(json --arg c "$CH" --arg o "$U" '{type: "webauthn.create", challenge: $c, origin: $o}' | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 # 100 000 verschachtelte Arrays (0x81) mit 0 als innerstem Wert – Bytes direkt kodieren, Nullbytes überleben keine Variable
 TIEF="$({ printf '\x81%.0s' $(seq 1 100000); printf '\x00'; } | base64 -w0 | tr '+/' '-_' | tr -d '=')"
-pruefe "100 000 Ebenen CBOR: kein Absturz, 400" "$(status pia -X POST "${A}passkeys" -d "$(json --arg c "$CD" --arg a "$TIEF" '{clientDataJSON: $c, attestationObject: $a}')")" '. == 400'
+# Über 128 KB passen nicht in ein einzelnes Programmargument: Body per Datei bauen und senden, sonst ginge er leer raus
+printf '%s' "$TIEF" > "$TMP/tief.b64"
+json --arg c "$CD" --rawfile a "$TMP/tief.b64" '{clientDataJSON: $c, attestationObject: $a}' > "$TMP/tief.json"
+pruefe "100 000 Ebenen CBOR: Anfrage vollständig gebaut" "$(jq '.attestationObject | length' "$TMP/tief.json")" '. > 130000'
+pruefe "100 000 Ebenen CBOR: kein Absturz, 400" "$(status pia -X POST "${A}passkeys" -d @"$TMP/tief.json")" '. == 400'
 CH="$(reg_challenge pia)"
 pruefe "sonst gültiger Passkey mit 20 Ebenen CBOR → 400" "$(status pia -X POST "${A}passkeys" -d "$(pk registrieren "$TMP/fremd.key" "$CH" "$U" "$RP" tief)")" '. == 400'
 pruefe "kein Base64url → 400" "$(status pia -X POST "${A}passkeys" -d '{"clientDataJSON":"!!!","attestationObject":"!!!"}')" '. == 400'
