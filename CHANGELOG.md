@@ -13,8 +13,13 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 - Kommandozeile: `lock-user`, `unlock-user` und `delete-user` (samt Zielen und Fotos, mit Rückfrage). Den letzten aktiven Admin sperren oder löschen sie nicht.
 - API: `PATCH destinations/<id>` setzt nur Favorit und/oder Besucht. Die Umschalter in der App nutzen ihn; bisher schickten sie alle Felder mit und konnten so eine gleichzeitige Änderung auf einem anderen Gerät überschreiben.
 
+### Sicherheit
+
+- `php server/cli.php set-password` beendet jetzt alle laufenden Sitzungen des Benutzers, wie der Passwortwechsel in der App. Bisher blieb z. B. nach einem kompromittierten Konto der Angreifer angemeldet.
+
 ### Behoben
 
+- Kommandozeile: `create-user` und `set-password` prüfen Benutzername und Passwort wie die App (Passwörter über 72 Bytes wurden still gekürzt, ungültiges UTF-8 im Namen legte die Benutzerliste der App lahm, ein doppelter Name endete mit Stacktrace). Fehler gehen auf stderr mit Exit-Code 1, auch bei unbekanntem Benutzer.
 - Im Profil stand unter „Zwei-Faktor-Anmeldung“ „nullnull“, solange sie nicht eingerichtet war, bei aktiver Zwei-Faktor-Anmeldung „null“.
 
 ### Intern

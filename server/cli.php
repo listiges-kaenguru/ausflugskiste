@@ -19,6 +19,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require __DIR__ . '/bootstrap.php';
+require __DIR__ . '/validation.php';
 
 // Einrichtungsfehler (z. B. fehlendes pdo_sqlite) lesbar ausgeben statt als Stacktrace.
 set_exception_handler(function (Throwable $error): never {
@@ -30,23 +31,23 @@ $command = $argv[1] ?? '';
 
 switch ($command) {
     case 'create-user':
-        [$username, $password] = [$argv[2] ?? '', $argv[3] ?? ''];
+        $username = cli_username($argv[2] ?? '');
+        $password = cli_password($argv[3] ?? '');
         $role = strtoupper($argv[4] ?? 'USER') === 'ADMIN' ? 'ADMIN' : 'USER';
-        if (strlen($username) < 3 || strlen($password) < 6) {
-            exit("Benutzername mindestens 3, Passwort mindestens 6 Zeichen.\n");
+        if (find_user_id($username) !== null) {
+            cli_fail("Benutzername $username ist bereits vergeben.");
         }
         cli_insert_user($username, $password, $role);
         echo "Benutzer $username ($role) angelegt.\n";
         break;
 
     case 'set-password':
-        [$username, $password] = [$argv[2] ?? '', $argv[3] ?? ''];
-        if (strlen($password) < 6) {
-            exit("Passwort mindestens 6 Zeichen.\n");
-        }
-        $stmt = db()->prepare('UPDATE "User" SET passwordHash = ?, updatedAt = ? WHERE username = ?');
-        $stmt->execute([hash_password($password), now(), $username]);
-        echo $stmt->rowCount() ? "Passwort für $username geändert.\n" : "Benutzer $username nicht gefunden.\n";
+        $user = cli_user($argv[2] ?? '');
+        $password = cli_password($argv[3] ?? '');
+        // Wie beim Passwortwechsel in der App: alle laufenden Sitzungen des Benutzers enden
+        db()->prepare('UPDATE "User" SET passwordHash = ?, sessionVersion = sessionVersion + 1, updatedAt = ? WHERE id = ?')
+            ->execute([hash_password($password), now(), $user['id']]);
+        echo "Passwort für {$user['username']} geändert, laufende Sitzungen beendet.\n";
         break;
 
     case 'list-users':
@@ -148,12 +149,41 @@ function cli_user_id(string $username): string
     return cli_user($username)['id'];
 }
 
+function cli_fail(string $message): never
+{
+    fwrite(STDERR, "$message\n");
+    exit(1);
+}
+
+/** Neuer Benutzername nach denselben Regeln wie in der App (getrimmt, 3–64 Zeichen). */
+function cli_username(string $username): string
+{
+    if (preg_match('//u', $username) !== 1) {
+        cli_fail('Benutzername ist kein gültiges UTF-8.');
+    }
+    $username = trim($username);
+    $error = username_error($username);
+    if ($error !== null) {
+        cli_fail("$error (3–64 Zeichen).");
+    }
+    return $username;
+}
+
+/** Passwort nach denselben Regeln wie in der App (6–72 Bytes). */
+function cli_password(string $password): string
+{
+    $error = password_error($password, 'Passwort');
+    if ($error !== null) {
+        cli_fail(str_contains($error, 'kurz') ? "$error (mindestens 6 Zeichen)." : "$error.");
+    }
+    return $password;
+}
+
 /** Benutzer zum Namen oder Abbruch mit Fehlermeldung. */
 function cli_user(string $username): array
 {
     if ($username === '') {
-        fwrite(STDERR, "Benutzername fehlt.\n");
-        exit(1);
+        cli_fail('Benutzername fehlt.');
     }
     $stmt = db()->prepare('SELECT id, username, role, disabledAt FROM "User" WHERE username = ?');
     $stmt->execute([$username]);
