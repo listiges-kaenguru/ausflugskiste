@@ -10,6 +10,8 @@ Offene Punkte und Ideen für spätere Versionen. Erledigtes wird hier gestrichen
   ist die DOM-Methode und macht aus `null` den Text „null“; nur `h()` filtert `null` heraus. Lösung: die
   Kinder mit `.filter(Boolean)` übergeben oder in ein `h()` packen; andere `replaceChildren`-Aufrufe mitprüfen.
 
+Ist TOTP aktiv, wird "null" angezeigt.
+
 ### Feature: Kategorien
 Eigene Kategorien anlegen (z. B. „Wandern“, „Museum“, „Mit Kindern“) und Ziele zuordnen.
 - Abgrenzung zu Tags klären: Kategorie = eine feste Einordnung pro Ziel (ggf. mit Icon/Farbe), Tags = freie Schlagworte. Alternativ Tags zu Kategorien ausbauen.
