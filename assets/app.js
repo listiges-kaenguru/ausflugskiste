@@ -931,11 +931,9 @@ function stars(rating) {
   );
 }
 
-/** Speichert ein Ziel mit geänderten Feldern; die API erwartet beim PUT alle Felder. */
-async function saveDestination(destination, changes) {
-  const { name, address, googleMapsLink, description, rating, favorite, visited, privateNotes } = destination;
-  const payload = { name, address, googleMapsLink, description, rating, favorite, visited, privateNotes, tagIds: destination.tags.map((tag) => tag.id), ...changes };
-  Object.assign(destination, await api(`destinations/${destination.id}`, { method: "PUT", body: payload }));
+/** Speichert nur Favorit/Besucht (PATCH), damit parallele Änderungen an anderen Feldern erhalten bleiben. */
+async function saveDestinationFlags(destination, changes) {
+  Object.assign(destination, await api(`destinations/${destination.id}`, { method: "PATCH", body: changes }));
 }
 
 const FLAGS = {
@@ -966,7 +964,7 @@ function flagButton(destination, flag, { compact = false, onChange } = {}) {
     onChange?.();
     button.disabled = true;
     try {
-      await saveDestination(destination, { [flag]: value });
+      await saveDestinationFlags(destination, { [flag]: value });
       toast(value ? def.on : def.off);
     } catch (error) {
       destination[flag] = !value;

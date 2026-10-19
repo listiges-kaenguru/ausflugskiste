@@ -79,12 +79,27 @@ pruefe "Version (aus dem Cache, ohne Netz)" "$(api "$U/api.php?r=version")" \
   '.success == true and (.data.installed | type == "string" and length > 0) and .data.latest == "9.9.9"'
 pruefe "Ziele lesen" "$(api "$U/api.php?r=destinations")" '.success == true and (.data | type == "array")'
 
+abschnitt "Favorit/Besucht per PATCH"
+VOLL='{"name":"Patch-Ziel","address":"Weg 1","description":"Text","rating":4,"privateNotes":"notiz","favorite":false,"visited":false}'
+DP="$(api -X POST "$U/api.php?r=destinations" -d "$VOLL" | jq -r '.data.id')"
+VORHER="$(api "$U/api.php?r=destinations/$DP")"
+pruefe "PATCH favorite → vollständiges Ziel zurück" "$(api -X PATCH "$U/api.php?r=destinations/$DP" -d '{"favorite":true}')" \
+  '.success == true and .data.favorite == true and .data.visited == false and .data.name == "Patch-Ziel"'
+pruefe "PATCH visited allein lässt favorite stehen" "$(api -X PATCH "$U/api.php?r=destinations/$DP" -d '{"visited":true}')" \
+  '.data.favorite == true and .data.visited == true'
+pruefe "PATCH beide zugleich" "$(api -X PATCH "$U/api.php?r=destinations/$DP" -d '{"favorite":false,"visited":false}')" \
+  '.data.favorite == false and .data.visited == false'
+pruefe "PATCH ändert keine anderen Felder" "$(jq -cn --argjson a "$VORHER" --argjson b "$(api "$U/api.php?r=destinations/$DP")" \
+  '[$a.data, $b.data] | map(del(.favorite, .visited, .updatedAt))')" '.[0] == .[1]'
+
 abschnitt "Oberfläche im Browser (Playwright)"
 SITZUNG="$(awk '$6 == "session" { print $7 }' "$TMP/k_test")"
 OBERFLAECHE="$(node "$ROOT/tests/oberflaeche.cjs" "$U" "$SITZUNG" 2>&1)"
 pruefe "Profil lädt ohne Skriptfehler" "$OBERFLAECHE" '.profileLoaded == true and .errors == []'
 pruefe "Profil ohne „null“/„undefined“ im Text (Zwei-Faktor aus)" "$OBERFLAECHE" '.profileNull == 0'
 pruefe "Profil: Knopf „Einrichten“ für Zwei-Faktor" "$OBERFLAECHE" '.totpSetupButton == 1'
+pruefe "Umschalter Favorit sendet PATCH nur mit favorite" "$OBERFLAECHE" '.toggleRequest.method == "PATCH" and .toggleRequest.body == {"favorite": true}'
+pruefe "Umschalter: Favorit danach gespeichert" "$(api "$U/api.php?r=destinations/$DP")" '.data.favorite == true and .data.name == "Patch-Ziel"'
 
 # shellcheck source=tests/sicherheit.sh
 . "$ROOT/tests/sicherheit.sh"

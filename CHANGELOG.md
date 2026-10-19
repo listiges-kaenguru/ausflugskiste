@@ -11,6 +11,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 ### Hinzugefügt
 
 - Kommandozeile: `lock-user`, `unlock-user` und `delete-user` (samt Zielen und Fotos, mit Rückfrage). Den letzten aktiven Admin sperren oder löschen sie nicht.
+- API: `PATCH destinations/<id>` setzt nur Favorit und/oder Besucht. Die Umschalter in der App nutzen ihn; bisher schickten sie alle Felder mit und konnten so eine gleichzeitige Änderung auf einem anderen Gerät überschreiben.
 
 ### Behoben
 

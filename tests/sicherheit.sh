@@ -26,7 +26,7 @@ A="$U/api.php?r="
 
 # ---------------------------------------------------------------------------------------------------------
 abschnitt "Ohne Anmeldung: geschützte Routen → 401"
-for r in 'GET destinations' 'POST destinations' 'GET destinations/x' 'PUT destinations/x' 'DELETE destinations/x' \
+for r in 'GET destinations' 'POST destinations' 'GET destinations/x' 'PUT destinations/x' 'PATCH destinations/x' 'DELETE destinations/x' \
   'GET tags' 'POST tags' 'GET users' 'POST users' 'GET version' 'GET passkeys' 'GET totp' 'POST change-password' \
   'GET images/x/file' 'DELETE images/x'; do
   set -- $r
@@ -63,6 +63,7 @@ pruefe "Anna: Ziel und Bild angelegt" "$(json --arg d "$DA" --arg i "$IA" '[$d, 
 pruefe "Ben: fremdes Ziel lesen → 404" "$(status ben "${A}destinations/$DA")" '. == 404'
 pruefe "Ben: fremdes Ziel ändern → 404" "$(status ben -X PUT "${A}destinations/$DA" -d '{"name":"übernommen"}')" '. == 404'
 pruefe "Ben: fremdes Ziel löschen → 404" "$(status ben -X DELETE "${A}destinations/$DA")" '. == 404'
+pruefe "Ben: fremdes Ziel als Favorit markieren (PATCH) → 404" "$(status ben -X PATCH "${A}destinations/$DA" -d '{"favorite":true}')" '. == 404'
 pruefe "Ben: fremdes Bild abrufen → 404" "$(status ben "${A}images/$IA/file")" '. == 404'
 pruefe "Ben: fremdes Bild löschen → 404" "$(status ben -X DELETE "${A}images/$IA")" '. == 404'
 pruefe "Ben: Bild an fremdes Ziel hängen → 404" "$(hochladen ben "$DA" "$TMP/bild.png")" '.error.code == "NOT_FOUND"'
@@ -70,6 +71,7 @@ pruefe "Ben: eigene Liste ohne Annas Ziel" "$(als ben "${A}destinations")" '.suc
 pruefe "Ben: Suche findet Annas Notiz nicht" "$(als ben "${A}destinations&search=geheim-anna")" '.data | length == 0'
 pruefe "Anna: Ziel unverändert, Bild noch da" "$(als anna "${A}destinations/$DA")" \
   '.data.name == "Annas Ziel" and .data.privateNotes == "geheim-anna" and (.data.images | length == 1)'
+pruefe "Anna: Ziel nach Bens PATCH kein Favorit" "$(als anna "${A}destinations/$DA")" '.data.favorite == false'
 pruefe "Anna: eigenes Bild abrufbar" "$(status anna "${A}images/$IA/file")" '. == 200'
 pruefe "Admin: sieht Annas Ziel nicht" "$(status admin "${A}destinations/$DA")" '. == 404'
 
@@ -133,6 +135,7 @@ pruefe "POST mit falschem X-Requested-With → 403" \
   "$(ohne_header anna -H 'X-Requested-With: XMLHttpRequest' -H 'Content-Type: application/json' -X POST "${A}destinations" -d '{"name":"csrf"}')" '. == 403'
 pruefe "Formular-POST (einfache Cross-Site-Anfrage) → 403" "$(ohne_header anna -X POST "${A}destinations" -d 'name=csrf')" '. == 403'
 pruefe "DELETE ohne Header → 403" "$(ohne_header anna -X DELETE "${A}destinations/$DA")" '. == 403'
+pruefe "PATCH ohne Header → 403" "$(ohne_header anna -H 'Content-Type: application/json' -X PATCH "${A}destinations/$DA" -d '{"favorite":true}')" '. == 403'
 pruefe "nichts angelegt oder gelöscht" "$(als anna "${A}destinations")" '[.data[] | select(.name == "csrf")] | length == 0'
 pruefe "Annas Ziel noch da" "$(status anna "${A}destinations/$DA")" '. == 200'
 
@@ -184,6 +187,24 @@ pruefe "Name leer → 400" "$(ziel '{"name":""}')" '. == 400'
 pruefe "Name nur Leerzeichen → 400" "$(ziel '{"name":"   "}')" '. == 400'
 pruefe "Name fehlt → 400" "$(ziel '{}')" '. == 400'
 pruefe "Name als Zahl → 400" "$(ziel '{"name":123}')" '. == 400'
+# PATCH destinations/<id>: nur favorite/visited als Boolean, sonst 400; das Ziel bleibt dabei unverändert
+DV="$(als anna -X POST "${A}destinations" -d '{"name":"Patch-Prüfung"}' | jq -r '.data.id')"
+flag() { status anna -X PATCH "${A}destinations/$DV" -d "$1"; }
+pruefe "PATCH leeres Objekt → 400" "$(flag '{}')" '. == 400'
+pruefe "PATCH JSON-Liste → 400" "$(flag '[true]')" '. == 400'
+pruefe "PATCH kein JSON → 400" "$(flag 'favorite=1')" '. == 400'
+pruefe "PATCH favorite als Zahl → 400" "$(flag '{"favorite":1}')" '. == 400'
+pruefe "PATCH favorite als Text → 400" "$(flag '{"favorite":"true"}')" '. == 400'
+pruefe "PATCH visited null → 400" "$(flag '{"visited":null}')" '. == 400'
+pruefe "PATCH mit anderem Feld (name) → 400" "$(flag '{"favorite":true,"name":"übernommen"}')" '. == 400'
+pruefe "PATCH nur anderes Feld (privateNotes) → 400" "$(flag '{"privateNotes":"x"}')" '. == 400'
+pruefe "PATCH createdBy als Boolean → 400" "$(flag '{"favorite":true,"createdBy":true}')" '. == 400'
+pruefe "PATCH deletedAt als Boolean → 400" "$(flag '{"deletedAt":true}')" '. == 400'
+pruefe "nach abgewiesenen PATCHs: Ziel unverändert" "$(als anna "${A}destinations/$DV")" \
+  '.data.name == "Patch-Prüfung" and .data.favorite == false and .data.visited == false and .data.privateNotes == null'
+pruefe "PATCH unbekannte ID → 404" "$(status anna -X PATCH "${A}destinations/gibt-es-nicht" -d '{"favorite":true}')" '. == 404'
+als anna -X DELETE "${A}destinations/$DV" >/dev/null
+pruefe "PATCH gelöschtes Ziel → 404" "$(flag '{"favorite":true}')" '. == 404'
 pruefe "Name als Liste → 400" "$(ziel '{"name":["a"]}')" '. == 400'
 pruefe "Name 200 Zeichen (Umlaute) → 201" "$(ziel "$(json --arg n "$(lang ä 200)" '{name: $n}')")" '. == 201'
 pruefe "Name 201 Zeichen → 400" "$(ziel "$(json --arg n "$(lang ä 201)" '{name: $n}')")" '. == 400'

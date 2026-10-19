@@ -25,6 +25,17 @@ const [base, session] = process.argv.slice(2);
     result.profileLoaded = true;
     result.profileNull = (text.match(/null|undefined/g) || []).length;
     result.totpSetupButton = await page.getByRole("button", { name: "Einrichten" }).count();
+
+    // Umschalter Favorit auf der Karte: welche Anfrage geht raus?
+    await page.goto(`${base}/#/`);
+    const toggle = page.getByRole("button", { name: "Favorit: Patch-Ziel" });
+    await toggle.waitFor({ timeout: 10000 });
+    const [request] = await Promise.all([
+      page.waitForRequest((r) => (new URL(r.url()).searchParams.get("r") ?? "").startsWith("destinations/") && r.method() !== "GET"),
+      toggle.click(),
+    ]);
+    await request.response();
+    result.toggleRequest = { method: request.method(), body: request.postDataJSON() };
     result.errors = errors;
   } catch (error) {
     result.failure = error.message.split("\n")[0];

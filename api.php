@@ -56,6 +56,7 @@ try {
         $resource === 'destinations' && $id === null && $method === 'POST' => create_destination(),
         $resource === 'destinations' && $id !== null && $method === 'GET' => respond(load_destination(own_destination($id))),
         $resource === 'destinations' && $id !== null && $method === 'PUT' => update_destination($id),
+        $resource === 'destinations' && $id !== null && $method === 'PATCH' => update_destination_flags($id),
         $resource === 'destinations' && $id !== null && $method === 'DELETE' => delete_destination($id),
 
         $resource === 'tags' && $id === null && $method === 'GET' => list_tags(),
@@ -898,6 +899,33 @@ function update_destination(string $id): never
         set_destination_tags($id, $input['tagIds']);
     }
     db()->commit();
+
+    respond(load_destination(own_destination($id)));
+}
+
+/** Setzt nur Favorit und/oder Besucht – für die Umschalter, ohne die übrigen Felder mitzuschicken. */
+function update_destination_flags(string $id): never
+{
+    own_destination($id);
+    $input = json_body();
+    $errors = [];
+    foreach ($input as $field => $value) {
+        if (!in_array($field, ['favorite', 'visited'], true)) {
+            $errors[(string) $field] = 'Nur favorite und visited lassen sich so ändern';
+        } elseif (!is_bool($value)) {
+            $errors[$field] = 'Ungültiger Wert';
+        }
+    }
+    if (!$input) {
+        $errors['favorite'] = 'favorite oder visited fehlt';
+    }
+    if ($errors) {
+        validation_failed($errors);
+    }
+
+    $sets = array_map(fn (string $field): string => "$field = ?", array_keys($input));
+    db()->prepare('UPDATE "Destination" SET ' . implode(', ', $sets) . ', updatedAt = ? WHERE id = ?')
+        ->execute([...array_map('intval', array_values($input)), now(), $id]);
 
     respond(load_destination(own_destination($id)));
 }
