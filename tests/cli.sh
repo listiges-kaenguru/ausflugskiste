@@ -80,3 +80,40 @@ pruefe "disable-totp $MIT_2FA" "$(cli disable-totp "$MIT_2FA")" '.code == 0 and 
 pruefe "danach ohne 2FA" "$(cli list-users | jq --arg n "$MIT_2FA" '.out | split("\n") | map(select(startswith($n + "\t") and test("\t2FA"))) | length')" '. == 0'
 pruefe "disable-totp unbekannter Benutzer → Fehler" "$(cli disable-totp niemand)" '.code == 1 and (.err | test("nicht gefunden"))'
 pruefe "disable-totp ohne Benutzername → Fehler" "$(cli disable-totp)" '.code == 1 and (.err | test("fehlt"))'
+
+# ---------------------------------------------------------------------------------------------------------
+abschnitt "CLI: Passwort setzen beendet Sitzungen"
+cli create-user emil Emil-Passwort-1 >/dev/null
+anmelden emil emil Emil-Passwort-1 >/dev/null
+anmelden emil2 emil Emil-Passwort-1 >/dev/null
+pruefe "zwei Sitzungen von emil aktiv" "$(json --arg a "$(status emil "${A}destinations")" --arg b "$(status emil2 "${A}destinations")" '[$a, $b]')" '. == ["200", "200"]'
+pruefe "set-password emil" "$(cli set-password emil Emil-Neu-12)" '.code == 0 and (.out | test("emil geändert"))'
+pruefe "set-password: erste Sitzung endet → 401" "$(status emil "${A}destinations")" '. == 401'
+pruefe "set-password: zweite Sitzung endet → 401" "$(status emil2 "${A}destinations")" '. == 401'
+pruefe "altes Passwort abgewiesen" "$(anmelden emil emil Emil-Passwort-1)" '.success != true'
+pruefe "neues Passwort gilt" "$(anmelden emil emil Emil-Neu-12)" '.success == true'
+pruefe "set-password unbekannter Benutzer → Fehler" "$(cli set-password niemand Passwort-123)" '.code == 1 and (.err | test("nicht gefunden"))'
+pruefe "set-password ohne Argumente → Fehler" "$(cli set-password)" '.code == 1 and (.err | length > 0)'
+
+abschnitt "CLI: gleiche Eingabeprüfung wie die API"
+pruefe "Passwort 5 Zeichen → Fehler" "$(cli set-password emil 12345)" '.code == 1 and (.err | test("zu kurz"))'
+pruefe "Passwort 6 Zeichen → ok" "$(cli set-password emil 123456)" '.code == 0'
+pruefe "Passwort 72 Bytes → ok" "$(cli set-password emil "$(lang p 72)")" '.code == 0'
+pruefe "Passwort 73 Bytes → Fehler" "$(cli set-password emil "$(lang p 73)")" '.code == 1 and (.err | test("zu lang"))'
+pruefe "Passwort 37 × ä (74 Bytes) → Fehler" "$(cli set-password emil "$(lang ä 37)")" '.code == 1 and (.err | test("zu lang"))'
+pruefe "abgewiesenes Passwort nicht gesetzt" "$(anmelden emil emil "$(lang p 72)")" '.success == true'
+pruefe "create-user Passwort 5 Zeichen → Fehler" "$(cli create-user fritz 12345)" '.code == 1 and (.err | test("zu kurz"))'
+pruefe "create-user Passwort 73 Bytes → Fehler" "$(cli create-user fritz "$(lang p 73)")" '.code == 1 and (.err | test("zu lang"))'
+pruefe "create-user Name 2 Zeichen → Fehler" "$(cli create-user ab Passwort-123)" '.code == 1 and (.err | test("zu kurz"))'
+pruefe "create-user Name nur Leerzeichen → Fehler" "$(cli create-user '     ' Passwort-123)" '.code == 1 and (.err | test("zu kurz"))'
+pruefe "create-user Name 65 Zeichen → Fehler" "$(cli create-user "$(lang v 65)" Passwort-123)" '.code == 1 and (.err | test("zu lang"))'
+pruefe "create-user Name 64 × ü → ok" "$(cli create-user "$(lang ü 64)" Passwort-123)" '.code == 0'
+pruefe "create-user ungültiges UTF-8 → Fehler" "$(cli create-user "$(printf 'ab\xff\xfe')" Passwort-123)" '.code == 1 and (.err | test("UTF-8"))'
+pruefe "create-user Name wird getrimmt" "$(cli create-user '  fritz  ' Passwort-123)" '.code == 0 and (.out | test("Benutzer fritz \\("))'
+pruefe "fritz meldet sich ohne Leerzeichen an" "$(anmelden fritz fritz Passwort-123)" '.success == true'
+pruefe "create-user doppelter Name → Fehler ohne Stacktrace" "$(cli create-user fritz Passwort-123)" \
+  '.code == 1 and (.err | test("bereits vergeben")) and (.err | test("PDO|SQLSTATE|#[0-9]|\\.php") | not)'
+pruefe "create-user Sonderzeichen wörtlich gespeichert" "$(cli create-user "o'brien; DROP" Passwort-123)" '.code == 0'
+pruefe "list-users zeigt ihn wörtlich, Tabelle intakt" "$(cli list-users)" '.code == 0 and (.out | test("o.brien; DROP\tUSER")) and (.out | test("fritz\tUSER"))'
+pruefe "create-user ohne Argumente → Fehler" "$(cli create-user)" '.code == 1 and (.err | length > 0)'
+pruefe "API-Benutzerliste weiter gültiges JSON" "$(als admin "${A}users")" '.success == true and ([.data[].username] | index("fritz") != null)'

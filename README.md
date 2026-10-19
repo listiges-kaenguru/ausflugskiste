@@ -138,7 +138,7 @@ php server/cli.php seed-demo
 ```sh
 php server/cli.php list-users
 php server/cli.php create-user <name> <passwort> [ADMIN|USER]
-php server/cli.php set-password <name> <passwort>
+php server/cli.php set-password <name> <passwort>                # beendet alle laufenden Sitzungen des Benutzers
 php server/cli.php list-passkeys <name>
 php server/cli.php delete-passkeys <name> [<passkey-id>]   # ohne ID: alle Passkeys des Benutzers
 php server/cli.php disable-totp <name>                      # Zwei-Faktor-Anmeldung abschalten
@@ -148,6 +148,7 @@ php server/cli.php delete-user <name>                       # samt Zielen und Fo
 ```
 Den letzten aktiven Admin sperren oder löschen `lock-user` und `delete-user` nicht – vorher einen weiteren Admin
 anlegen.
+Für Benutzernamen und Passwörter gelten dieselben Regeln wie in der App (Name 3–64 Zeichen, Passwort 6–72 Bytes).
 
 ## Backup & Restore
 Alle Daten liegen in `data/`:
