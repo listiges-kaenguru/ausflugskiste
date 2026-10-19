@@ -193,6 +193,12 @@ Unter **Anmeldung & Sicherheit** → **Passwort ändern**: aktuelles Passwort un
 (mindestens 6 Zeichen), dann **Passwort ändern**. Auf allen anderen Geräten bist du danach abgemeldet – praktisch,
 wenn jemand dein altes Passwort kennt.
 
+### Deine Daten
+
+Unter **Deine Daten** → **Ziele exportieren** lädst du alle deine Ziele als Datei herunter: mit Adresse,
+Beschreibung, Bewertung, Favorit und Besucht, privaten Notizen und Tags. Das eignet sich als Sicherung oder zum
+Mitnehmen. Fotos sind nicht enthalten, nur die Angabe, wie viele es sind. Gelöschte Ziele sind auch nicht dabei.
+
 ### Tags
 
 Hier siehst du alle Tags. Sie gelten für alle Benutzer. Neue Tags legst du beim Bearbeiten eines Ziels an,

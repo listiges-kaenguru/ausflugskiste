@@ -10,6 +10,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ### Hinzugefügt
 
+- **Export:** Im Profil unter „Deine Daten“ lädt **Ziele exportieren** alle eigenen Ziele als JSON-Datei herunter (mit Notizen und Tags, Fotos nur als Angaben). Neuer Endpunkt `GET destinations/export`.
 - Kommandozeile: `lock-user`, `unlock-user` und `delete-user` (samt Zielen und Fotos, mit Rückfrage). Den letzten aktiven Admin sperren oder löschen sie nicht.
 - API: `PATCH destinations/<id>` setzt nur Favorit und/oder Besucht. Die Umschalter in der App nutzen ihn; bisher schickten sie alle Felder mit und konnten so eine gleichzeitige Änderung auf einem anderen Gerät überschreiben.
 
@@ -25,6 +26,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 ### Intern
 
 - Browsertest der Oberfläche (`tests/oberflaeche.cjs`, Playwright aus der Testumgebung) prüft das Profil.
+- Tests des Exports in `tests/export.sh` (fremde und gelöschte Ziele, Dateiname bei Sonderzeichen im Benutzernamen).
 - Tests der Kommandozeile in `tests/cli.sh` (auch `disable-totp`); API und Kommandozeile löschen Benutzer über dieselbe Funktion.
 - PHPStan ohne Funde: Routen-Filter ohne `strlen`-Callback, `disable-totp` nennt den Benutzer aus der Datenbank.
 - Der Test mit 100 000 Ebenen CBOR (Passkeys) sendet die Anfrage jetzt wirklich: Der Body war größer als ein Programmargument sein darf, ging leer raus und bestand so, ohne den Decoder zu erreichen.
