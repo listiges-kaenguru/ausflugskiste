@@ -142,7 +142,12 @@ php server/cli.php set-password <name> <passwort>
 php server/cli.php list-passkeys <name>
 php server/cli.php delete-passkeys <name> [<passkey-id>]   # ohne ID: alle Passkeys des Benutzers
 php server/cli.php disable-totp <name>                      # Zwei-Faktor-Anmeldung abschalten
+php server/cli.php lock-user <name>                         # sperren, laufende Sitzungen enden sofort
+php server/cli.php unlock-user <name>                       # Sperre aufheben
+php server/cli.php delete-user <name>                       # samt Zielen und Fotos, fragt vorher nach („ja“)
 ```
+Den letzten aktiven Admin sperren oder löschen `lock-user` und `delete-user` nicht – vorher einen weiteren Admin
+anlegen.
 
 ## Backup & Restore
 Alle Daten liegen in `data/`:
@@ -179,7 +184,8 @@ Binärdaten der Passkey-Endpunkte (Challenge, Schlüssel-IDs, Antworten des Brow
 | POST | `passkeys/options` | Optionen zum Anlegen eines Passkeys |
 | PUT/DELETE | `passkeys/<id>` | Passkey umbenennen / entfernen |
 | GET/POST | `destinations` | Ziele auflisten (Filter: `search`, `favorite`, `visited`, `minRating` (1–5), `tag[]` – mehrfach angebbar, Treffer haben alle Tags) / anlegen |
-| GET/PUT/DELETE | `destinations/<id>` | Ziel lesen / ändern / löschen |
+| GET/PUT/DELETE | `destinations/<id>` | Ziel lesen / ändern (alle Felder) / löschen |
+| PATCH | `destinations/<id>` | Nur Favorit/Besucht setzen: `{ "favorite": true }`, `{ "visited": false }` oder beides; andere Felder → 400 |
 | GET/POST | `tags` | Tags auflisten / anlegen |
 | PUT/DELETE | `tags/<id>` | Tag umbenennen / löschen (nur Admin) |
 | POST | `images` | Bild hochladen (`multipart/form-data`: `destinationId`, `file`) |

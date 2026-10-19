@@ -16,7 +16,7 @@ security_headers();
 
 try {
     $method = $_SERVER['REQUEST_METHOD'];
-    $segments = array_values(array_filter(explode('/', (string) ($_GET['r'] ?? '')), 'strlen'));
+    $segments = array_values(array_filter(explode('/', (string) ($_GET['r'] ?? '')), fn (string $part): bool => $part !== ''));
     $resource = $segments[0] ?? '';
     $id = $segments[1] ?? null;
     $action = $segments[2] ?? null;
@@ -56,6 +56,7 @@ try {
         $resource === 'destinations' && $id === null && $method === 'POST' => create_destination(),
         $resource === 'destinations' && $id !== null && $method === 'GET' => respond(load_destination(own_destination($id))),
         $resource === 'destinations' && $id !== null && $method === 'PUT' => update_destination($id),
+        $resource === 'destinations' && $id !== null && $method === 'PATCH' => update_destination_flags($id),
         $resource === 'destinations' && $id !== null && $method === 'DELETE' => delete_destination($id),
 
         $resource === 'tags' && $id === null && $method === 'GET' => list_tags(),
@@ -746,18 +747,11 @@ function reset_user_totp(string $id): never
     respond(['ok' => true]);
 }
 
-/** Löscht den Benutzer samt Zielen, Fotos und Passkeys (Fremdschlüssel mit ON DELETE CASCADE). */
+/** Löscht den Benutzer samt Zielen, Fotos und Passkeys. */
 function delete_user(string $id): never
 {
     other_user($id);
-    $stmt = db()->prepare('SELECT i.filename FROM "DestinationImage" i JOIN "Destination" d ON d.id = i.destinationId WHERE d.createdBy = ?');
-    $stmt->execute([$id]);
-    $files = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    db()->prepare('DELETE FROM "User" WHERE id = ?')->execute([$id]);
-    foreach ($files as $filename) {
-        @unlink(image_path($filename));
-    }
+    delete_user_account($id);
     respond(['ok' => true]);
 }
 
@@ -909,6 +903,33 @@ function update_destination(string $id): never
     respond(load_destination(own_destination($id)));
 }
 
+/** Setzt nur Favorit und/oder Besucht – für die Umschalter, ohne die übrigen Felder mitzuschicken. */
+function update_destination_flags(string $id): never
+{
+    own_destination($id);
+    $input = json_body();
+    $errors = [];
+    foreach ($input as $field => $value) {
+        if (!in_array($field, ['favorite', 'visited'], true)) {
+            $errors[(string) $field] = 'Nur favorite und visited lassen sich so ändern';
+        } elseif (!is_bool($value)) {
+            $errors[$field] = 'Ungültiger Wert';
+        }
+    }
+    if (!$input) {
+        $errors['favorite'] = 'favorite oder visited fehlt';
+    }
+    if ($errors) {
+        validation_failed($errors);
+    }
+
+    $sets = array_map(fn (string $field): string => "$field = ?", array_keys($input));
+    db()->prepare('UPDATE "Destination" SET ' . implode(', ', $sets) . ', updatedAt = ? WHERE id = ?')
+        ->execute([...array_map('intval', array_values($input)), now(), $id]);
+
+    respond(load_destination(own_destination($id)));
+}
+
 function set_destination_tags(string $destinationId, array $tagIds): void
 {
     db()->prepare('DELETE FROM "DestinationTag" WHERE destinationId = ?')->execute([$destinationId]);
@@ -1032,11 +1053,6 @@ function own_image(string $id): array
     $stmt = db()->prepare('SELECT i.* FROM "DestinationImage" i JOIN "Destination" d ON d.id = i.destinationId WHERE i.id = ? AND d.createdBy = ?');
     $stmt->execute([$id, $user['id']]);
     return $stmt->fetch() ?: fail(404, 'NOT_FOUND', 'Bild nicht gefunden');
-}
-
-function image_path(string $filename): string
-{
-    return data_dir() . '/uploads/' . basename($filename);
 }
 
 function image_url(string $id): string

@@ -8,6 +8,21 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+
+- Kommandozeile: `lock-user`, `unlock-user` und `delete-user` (samt Zielen und Fotos, mit Rückfrage). Den letzten aktiven Admin sperren oder löschen sie nicht.
+- API: `PATCH destinations/<id>` setzt nur Favorit und/oder Besucht. Die Umschalter in der App nutzen ihn; bisher schickten sie alle Felder mit und konnten so eine gleichzeitige Änderung auf einem anderen Gerät überschreiben.
+
+### Behoben
+
+- Im Profil stand unter „Zwei-Faktor-Anmeldung“ „nullnull“, solange sie nicht eingerichtet war, bei aktiver Zwei-Faktor-Anmeldung „null“.
+
+### Intern
+
+- Browsertest der Oberfläche (`tests/oberflaeche.cjs`, Playwright aus der Testumgebung) prüft das Profil.
+- Tests der Kommandozeile in `tests/cli.sh` (auch `disable-totp`); API und Kommandozeile löschen Benutzer über dieselbe Funktion.
+- PHPStan ohne Funde: Routen-Filter ohne `strlen`-Callback, `disable-totp` nennt den Benutzer aus der Datenbank.
+
 ## [0.5.1] – 2026-10-18
 
 Sicherheitskorrektur: Ein Passwortwechsel beendet die Sitzungen auf anderen Geräten.

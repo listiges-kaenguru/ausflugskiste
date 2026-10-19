@@ -5,13 +5,6 @@ Offene Punkte und Ideen für spätere Versionen. Erledigtes wird hier gestrichen
 
 ## ToDo
 
-- [ ] **Fehler „nullnull“ im Profil:** Unter „Zwei-Faktor-Anmeldung“ steht „nullnull“, wenn TOTP nicht aktiv ist
-  (beobachtet lokal ohne `openssl`). Ursache: `container.replaceChildren(...)` in `assets/app.js` (TOTP-Abschnitt)
-  ist die DOM-Methode und macht aus `null` den Text „null“; nur `h()` filtert `null` heraus. Lösung: die
-  Kinder mit `.filter(Boolean)` übergeben oder in ein `h()` packen; andere `replaceChildren`-Aufrufe mitprüfen.
-
-Ist TOTP aktiv, wird "null" angezeigt.
-
 ### Feature: Kategorien
 Eigene Kategorien anlegen (z. B. „Wandern“, „Museum“, „Mit Kindern“) und Ziele zuordnen.
 - Abgrenzung zu Tags klären: Kategorie = eine feste Einordnung pro Ziel (ggf. mit Icon/Farbe), Tags = freie Schlagworte. Alternativ Tags zu Kategorien ausbauen.
@@ -34,5 +27,3 @@ Ziele (einzeln oder eine ganze Kategorie) mit anderen Benutzern teilen.
 - **Offline-Fähigkeit**: Service Worker für die PWA (App-Shell cachen, Liste zuletzt geladener Ziele offline anzeigen).
 - **Export/Import**: Ziele als JSON/CSV oder GPX exportieren – auch als Backup pro Benutzer.
 - **Paginierung**: Die Zielliste lädt derzeit alles auf einmal und filtert im Browser – bei sehr vielen Zielen seitenweise laden und wieder serverseitig filtern (die API-Parameter dafür gibt es).
-- **Schlanker Endpunkt für Favorit/Besucht**: Die Umschalter auf den Karten senden derzeit per `PUT` alle Felder; ein `PATCH destinations/<id>` würde reichen.
-- **Benutzerverwaltung per CLI**: `lock-user`, `unlock-user`, `delete-user` in `server/cli.php`.
