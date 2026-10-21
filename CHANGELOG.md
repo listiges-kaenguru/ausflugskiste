@@ -32,6 +32,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 - Der Test mit 100 000 Ebenen CBOR (Passkeys) sendet die Anfrage jetzt wirklich: Der Body war größer als ein Programmargument sein darf, ging leer raus und bestand so, ohne den Decoder zu erreichen.
 - Hinweise für Mitwirkende (`CLAUDE.md`, CHANGELOG) allgemein formuliert, ohne lokale Pfade und eigene Werkzeuge; offene Release-Schritte für 0.6.0 in `IDEEN.md`.
 - Testskripte nennen in Meldungen und Kommentaren keinen lokalen Pfad mehr, sondern verweisen auf einen Container mit den Testwerkzeugen und die README.
+- Hinweise für Mitwirkende beziehen sich nicht mehr auf andere Projekte; jedes Projekt ist für sich beschrieben.
 
 ## [0.5.1] – 2026-10-18
 

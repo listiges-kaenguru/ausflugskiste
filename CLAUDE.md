@@ -1,7 +1,7 @@
 # Ausflugskiste – Hinweise für Claude
 
-PWA zum Sammeln und Bewerten von Ausflugszielen (PHP + SQLite, Vanilla JS). Projektseite und Anleitung im
-Projekt `../ausflugskiste-web` (<https://ausflugskiste.schmaralde.de/>), Demo im Projekt `../ausflugskiste-demo`.
+PWA zum Sammeln und Bewerten von Ausflugszielen (PHP + SQLite, Vanilla JS). Projektseite mit Anleitung:
+<https://ausflugskiste.schmaralde.de/>, Demo: <https://ausflugskiste.schmaralde.de/demo/>.
 
 ## Orientierung
 
@@ -33,10 +33,7 @@ Die App läuft bewusst **ohne Abhängigkeiten und ohne Build-Schritt** auf einem
   startet die eigene Arbeitskopie.
 - Login: Passkeys und Zwei-Faktor per TOTP gehören dazu; neue Anmeldewege bekommen beides.
 
-## Abhängige Projekte
+## Doku
 
-- Bei sichtbaren Änderungen `BENUTZERHANDBUCH.md` anpassen (Knopf-Beschriftungen exakt wie in der UI). Neue oder
-  geänderte Funktionen auch auf der Projektseite (`../ausflugskiste-web`) beschreiben.
-- Nach jedem Release: `../ausflugskiste-web/scripts/build-download.sh` und `../ausflugskiste-demo/scripts/build.sh`
-  ausführen (neue Dateien der App dort in `FILES` ergänzen), committen und beide hochladen. Die Projektseite
-  erst mit dem Release hochladen, damit sie nichts beschreibt, was die veröffentlichte Version nicht kann.
+- Bei sichtbaren Änderungen `BENUTZERHANDBUCH.md` anpassen (Knopf-Beschriftungen exakt wie in der UI); es ist auch
+  die Quelle der Anleitung auf der Projektseite.
