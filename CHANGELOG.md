@@ -30,6 +30,7 @@ Solange die Version unter 1.0.0 liegt, können sich Datenmodell und API jederzei
 - Tests der Kommandozeile in `tests/cli.sh` (auch `disable-totp`); API und Kommandozeile löschen Benutzer über dieselbe Funktion.
 - PHPStan ohne Funde: Routen-Filter ohne `strlen`-Callback, `disable-totp` nennt den Benutzer aus der Datenbank.
 - Der Test mit 100 000 Ebenen CBOR (Passkeys) sendet die Anfrage jetzt wirklich: Der Body war größer als ein Programmargument sein darf, ging leer raus und bestand so, ohne den Decoder zu erreichen.
+- Hinweise für Mitwirkende (`CLAUDE.md`, CHANGELOG) allgemein formuliert, ohne lokale Pfade und eigene Werkzeuge; offene Release-Schritte für 0.6.0 in `IDEEN.md`.
 
 ## [0.5.1] – 2026-10-18
 
@@ -41,7 +42,7 @@ Sicherheitskorrektur: Ein Passwortwechsel beendet die Sitzungen auf anderen Ger�
 
 ### Intern
 
-- Tests laufen in der gemeinsamen Testumgebung (`~/projects/testumgebung/pt test`): Syntax, Einrichtung und Anmeldung mit frischer SQLite-DB.
+- Tests laufen in einem Container (`tests/run.sh`): Syntax, Einrichtung und Anmeldung mit frischer SQLite-DB.
 - API-Tests liegen jetzt im Projekt (`tests/run.sh`, Bash ohne Framework) statt zentral in der Testumgebung; `tests/` ist nicht im Release-ZIP.
 - Tests schärfer: Versions- und Ziele-Prüfung erkennen Fehlerantworten; die Versionsprüfung läuft nach der Anmeldung und ohne Netz (fester Cache statt GitHub-Abfrage).
 - Negativtests in `tests/sicherheit.sh` (226 Prüfungen): Rechte, Sitzungen, CSRF, Login-Sperre, Zwei-Faktor, Passkeys (ES256/RS256), Injection, Eingabevalidierung, Fehlermeldungen; unabhängige TOTP-Berechnung und Passkey-Simulation in `tests/`.

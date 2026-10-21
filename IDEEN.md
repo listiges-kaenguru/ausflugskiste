@@ -5,6 +5,12 @@ Offene Punkte und Ideen für spätere Versionen. Erledigtes wird hier gestrichen
 
 ## ToDo
 
+### Release 0.6.0 vorbereiten
+- [ ] Offen ist, ob noch etwas in 0.6.0 kommt. Der Stand unter `## [Unveröffentlicht]` (Export, neue
+  CLI-Befehle, `PATCH destinations/<id>`) ist dafür vorgesehen; Versionssprung wegen der neuen API-Funktion.
+- [ ] Beim Release Projektseite (`../ausflugskiste-web`, Anleitung mit „Deine Daten“) und Demo mit bauen und
+  zusammen hochladen. Die Startseite der Projektseite erwähnt den Export schon und darf nicht vorher online gehen.
+
 ### Feature: Kategorien
 Eigene Kategorien anlegen (z. B. „Wandern“, „Museum“, „Mit Kindern“) und Ziele zuordnen.
 - Abgrenzung zu Tags klären: Kategorie = eine feste Einordnung pro Ziel (ggf. mit Icon/Farbe), Tags = freie Schlagworte. Alternativ Tags zu Kategorien ausbauen.
